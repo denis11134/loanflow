@@ -1,0 +1,57 @@
+site_name: LoanFlow
+site_description: Учебный кредитный конвейер для потребительских кредитов
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  language: ru
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Тёмная тема
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Светлая тема
+
+plugins:
+  - search:
+      lang:
+        - ru
+        - en
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Главная: index.md
+  - Бизнес-контекст: 01-business/index.md
+  - Процессы: 02-processes/index.md
+  - Требования: 03-requirements/index.md
+  - Модель данных: 04-data/index.md
+  - API: 05-api/index.md
+  - Интеграции: 06-integrations/index.md
+  - Архитектура: 07-architecture/index.md
+  - Архитектурные решения: decisions/index.md
