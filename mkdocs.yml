@@ -47,7 +47,10 @@ markdown_extensions:
 
 nav:
   - Главная: index.md
-  - Бизнес-контекст: 01-business/index.md
+  - Бизнес-контекст:
+      - 01-business/index.md
+      - Протокол интервью: 01-business/1.1-interview-protocol.md
+      - Глоссарий и регуляторика: 01-business/1.2-glossary-and-regulations.md
   - Процессы: 02-processes/index.md
   - Требования: 03-requirements/index.md
   - Модель данных: 04-data/index.md
