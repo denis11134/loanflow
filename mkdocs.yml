@@ -50,7 +50,10 @@ nav:
   - Бизнес-контекст:
       - 01-business/index.md
       - Протокол интервью: 01-business/1.1-interview-protocol.md
+      - Протокол эскалации: 01-business/1.1.1-escalation-protocol.md
       - Глоссарий и регуляторика: 01-business/1.2-glossary-and-regulations.md
+      - Vision & Scope (BRD): 01-business/1.3-brd.md
+      - Реестр открытых вопросов: 01-business/action-tracker.md
   - Процессы: 02-processes/index.md
   - Требования: 03-requirements/index.md
   - Модель данных: 04-data/index.md
