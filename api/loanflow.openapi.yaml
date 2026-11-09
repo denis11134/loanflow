@@ -1452,15 +1452,25 @@ components:
             type: string
             enum:
             - WITHDRAWAL_UNAVAILABLE
+    PositiveAmountMinor:
+      type: string
+      description: Положительная сумма в копейках. Максимум 9223372036854775807.
+      # Для 19 цифр ветви соответствуют первому разряду меньше верхней границы.
+      pattern: '^(?:[1-9][0-9]{0,17}|[1-8][0-9]{18}|9[01][0-9]{17}|92[01][0-9]{16}|922[0-2][0-9]{15}|9223[0-2][0-9]{14}|92233[0-6][0-9]{13}|922337[01][0-9]{12}|92233720[0-2][0-9]{10}|922337203[0-5][0-9]{9}|9223372036[0-7][0-9]{8}|92233720368[0-4][0-9]{7}|922337203685[0-3][0-9]{6}|9223372036854[0-6][0-9]{5}|92233720368547[0-6][0-9]{4}|922337203685477[0-4][0-9]{3}|9223372036854775[0-7][0-9]{2}|922337203685477580[0-7])(?![\s\S])'
+    NullablePositiveAmountMinor:
+      type: string
+      nullable: true
+      anyOf:
+      - $ref: '#/components/schemas/PositiveAmountMinor'
+      - type: string
+        nullable: true
+        enum: [null]
     DraftInput:
       type: object
       additionalProperties: false
       properties:
         requested_amount_minor:
-          type: string
-          pattern: ^[1-9][0-9]{0,18}$
-          description: Положительная сумма в копейках. Максимум 9223372036854775807.
-          nullable: true
+          $ref: '#/components/schemas/NullablePositiveAmountMinor'
         requested_term_months:
           type: integer
           minimum: 1
@@ -1471,10 +1481,7 @@ components:
       additionalProperties: false
       properties:
         requested_amount_minor:
-          type: string
-          pattern: ^[1-9][0-9]{0,18}$
-          description: Положительная сумма в копейках. Максимум 9223372036854775807.
-          nullable: true
+          $ref: '#/components/schemas/NullablePositiveAmountMinor'
         requested_term_months:
           type: integer
           minimum: 1
@@ -1500,10 +1507,7 @@ components:
           description: Момент времени с явным смещением.
           nullable: true
         requested_amount_minor:
-          type: string
-          pattern: ^[1-9][0-9]{0,18}$
-          description: Положительная сумма в копейках. Максимум 9223372036854775807.
-          nullable: true
+          $ref: '#/components/schemas/NullablePositiveAmountMinor'
         requested_term_months:
           type: integer
           minimum: 1
@@ -1561,6 +1565,66 @@ components:
       - contract_id
       - display_reason
       - available_actions
+      allOf:
+      # Условие выполнено, если каждое действие разрешено для текущего состояния.
+      - anyOf:
+        - properties:
+            status:
+              enum: [DRAFT]
+        - properties:
+            available_actions:
+              items:
+                not:
+                  enum: [EDIT_DRAFT, SUBMIT]
+      - anyOf:
+        - properties:
+            status:
+              enum: [DRAFT, SCORING, UNDERWRITING, APPROVED]
+        - properties:
+            available_actions:
+              items:
+                not:
+                  enum: [CANCEL_APPLICATION]
+      - anyOf:
+        - properties:
+            offer_availability:
+              enum: [AVAILABLE, EXPIRED]
+        - properties:
+            available_actions:
+              items:
+                not:
+                  enum: [OPEN_TERMS]
+      - anyOf:
+        - properties:
+            status:
+              enum: [APPROVED]
+            offer_availability:
+              enum: [AVAILABLE]
+            offer_expires_at:
+              type: string
+            active_attempt_id:
+              enum: [null]
+        - properties:
+            available_actions:
+              items:
+                not:
+                  enum: [START_SIGNING]
+      - anyOf:
+        - properties:
+            status:
+              not:
+                enum: [SCORING]
+        - properties:
+            submitted_at:
+              type: string
+      - anyOf:
+        - properties:
+            status:
+              not:
+                enum: [CONTRACT_SIGNED]
+        - properties:
+            contract_id:
+              type: string
     SubmissionReceipt:
       type: object
       additionalProperties: false
@@ -1643,9 +1707,7 @@ components:
           type: string
           format: uuid
         amount_minor:
-          type: string
-          pattern: ^[1-9][0-9]{0,18}$
-          description: Положительная сумма в копейках. Максимум 9223372036854775807.
+          $ref: '#/components/schemas/PositiveAmountMinor'
         term_months:
           type: integer
           minimum: 1
@@ -1842,6 +1904,13 @@ components:
             type: string
             enum:
             - OPEN
+        anyOf:
+        - properties:
+            resends_remaining:
+              minimum: 1
+        - properties:
+            can_resend:
+              enum: [false]
         not:
           anyOf:
           - required:
@@ -1872,6 +1941,10 @@ components:
             type: string
             enum:
             - SIGNED
+          can_resend:
+            enum: [false]
+          can_verify:
+            enum: [false]
         required:
         - contract_id
         not:
@@ -1882,6 +1955,10 @@ components:
             type: string
             enum:
             - CLOSED
+          can_resend:
+            enum: [false]
+          can_verify:
+            enum: [false]
         required:
         - close_reason
         not:
@@ -1923,6 +2000,34 @@ components:
       - cooling_ends_at
       - posted_at
       - can_withdraw
+      allOf:
+      - $ref: '#/components/schemas/ContractViewTiming'
+      - anyOf:
+        - properties:
+            status:
+              enum: [COOLING_OFF]
+        - properties:
+            can_withdraw:
+              enum: [false]
+    ContractViewTiming:
+      oneOf:
+      - properties:
+          status:
+            enum: [COOLING_OFF]
+          cooling_ends_at:
+            type: string
+          posted_at:
+            enum: [null]
+      - properties:
+          status:
+            enum: [DISBURSED]
+          posted_at:
+            type: string
+      - properties:
+          status:
+            enum: [CANCELED_BY_CLIENT, DISBURSEMENT_PROCESSING, DISBURSEMENT_FAILED]
+          posted_at:
+            enum: [null]
     ContractCancellation:
       type: object
       additionalProperties: false
@@ -1976,6 +2081,15 @@ components:
       - cooling_ends_at
       - posted_at
       - withdrawal_available_after_identification
+      allOf:
+      - $ref: '#/components/schemas/ContractViewTiming'
+      - anyOf:
+        - properties:
+            status:
+              enum: [COOLING_OFF]
+        - properties:
+            withdrawal_available_after_identification:
+              enum: [false]
     ContactStatus:
       type: object
       additionalProperties: false
@@ -2036,9 +2150,7 @@ components:
           format: date-time
           description: Момент времени с явным смещением.
         requested_amount_minor:
-          type: string
-          pattern: ^[1-9][0-9]{0,18}$
-          description: Положительная сумма в копейках. Максимум 9223372036854775807.
+          $ref: '#/components/schemas/PositiveAmountMinor'
         requested_term_months:
           type: integer
           minimum: 1
@@ -2109,6 +2221,31 @@ components:
       - decision
       - application_status
       - decided_at
+      oneOf:
+      - properties:
+          command:
+            enum: [APPROVE]
+          decision:
+            enum: [APPROVED]
+          application_status:
+            enum: [APPROVED]
+        not:
+          required: [rejection_reason_code]
+      - properties:
+          command:
+            enum: [APPROVE]
+          decision:
+            enum: [REJECTED]
+          application_status:
+            enum: [BANK_REJECTED]
+        required: [rejection_reason_code]
+      - properties:
+          command:
+            enum: [REJECT]
+          decision:
+            enum: [REJECTED]
+          application_status:
+            enum: [BANK_REJECTED]
     UnderwriterWeeklyMetrics:
       type: object
       additionalProperties: false
@@ -2294,6 +2431,29 @@ components:
         not:
           required:
           - final_result
+        oneOf:
+        - properties:
+            close_command_accepted:
+              enum: [true]
+            can_close:
+              enum: [false]
+            can_retry_close:
+              enum: [true]
+        - properties:
+            close_command_accepted:
+              enum: [false]
+            can_retry_close:
+              enum: [false]
+          anyOf:
+          - properties:
+              can_close:
+                enum: [false]
+          - required: [last_read]
+            properties:
+              last_read:
+                properties:
+                  result:
+                    enum: [NOT_FOUND, PENDING]
       - properties:
           contract_status:
             type: string

@@ -37,7 +37,7 @@ jobs:
           name: technical-results
           path: test-results/
   contracts:
-    name: Контракты — блокирует при известных дефектах
+    name: Контрактные примеры OpenAPI
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

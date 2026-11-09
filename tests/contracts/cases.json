@@ -2791,5 +2791,271 @@
     "valid": false,
     "operation": "getOwnApplication",
     "status": 200
+  },
+  {
+    "id": "open_exhausted_can_still_verify",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "10000000-0000-0000-0000-000000000001",
+      "state": "OPEN",
+      "expires_at": "2026-11-09T10:05:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 0,
+      "can_resend": false,
+      "can_verify": true
+    },
+    "valid": true,
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "draft_cancelled_without_submission",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "CLIENT_CANCELED",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": null,
+      "requested_amount_minor": null,
+      "requested_term_months": null,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": []
+    },
+    "valid": true,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "signing_cannot_cancel_application",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "SIGNING_IN_PROGRESS",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "AVAILABLE",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "active_attempt_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "CANCEL_APPLICATION"
+      ]
+    },
+    "valid": false,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "underwriting_can_cancel_application",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "UNDERWRITING",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "CANCEL_APPLICATION"
+      ]
+    },
+    "valid": true,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "approved_published_terms_and_signing",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "APPROVED",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "AVAILABLE",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "OPEN_TERMS",
+        "START_SIGNING"
+      ]
+    },
+    "valid": true,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "preparing_terms_cannot_start_signing",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "APPROVED",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "PREPARING",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "START_SIGNING"
+      ]
+    },
+    "valid": false,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "preparing_terms_cannot_open_terms",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "APPROVED",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "PREPARING",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "OPEN_TERMS"
+      ]
+    },
+    "valid": false,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "accepted_close_is_retry_only",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_PROCESSING",
+      "close_command_accepted": true,
+      "can_close": true,
+      "can_retry_close": true,
+      "last_read": {
+        "instruction_id": "10000000-0000-0000-0000-000000000001",
+        "read_seq": 2,
+        "requested_at": "2026-11-09T10:00:00+04:00",
+        "result": "PENDING"
+      }
+    },
+    "valid": false,
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "accepted_close_without_retry_flag",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_PROCESSING",
+      "close_command_accepted": true,
+      "can_close": false,
+      "can_retry_close": false,
+      "last_read": {
+        "instruction_id": "10000000-0000-0000-0000-000000000001",
+        "read_seq": 3,
+        "requested_at": "2026-11-09T10:00:00+04:00",
+        "result": "WAITING"
+      }
+    },
+    "valid": false,
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "final_posted_cannot_offer_retry",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSED",
+      "close_command_accepted": true,
+      "can_close": false,
+      "can_retry_close": true,
+      "final_result": "POSTED"
+    },
+    "valid": false,
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "contact_cooling_without_action",
+    "api": "loanflow",
+    "schema": "ContactContract",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "status": "COOLING_OFF",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": null,
+      "withdrawal_available_after_identification": false
+    },
+    "valid": true
+  },
+  {
+    "id": "manual_explicit_reject_with_reason",
+    "api": "loanflow",
+    "schema": "ManualDecisionReceipt",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "command": "REJECT",
+      "decision": "REJECTED",
+      "application_status": "BANK_REJECTED",
+      "decided_at": "2026-11-09T10:00:00+04:00",
+      "rejection_reason_code": "MANUAL_DECLINE"
+    },
+    "valid": true,
+    "operation": "recordManualDecision",
+    "status": 200
+  },
+  {
+    "id": "manual_psk_reject",
+    "api": "loanflow",
+    "schema": "ManualDecisionReceipt",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "command": "APPROVE",
+      "decision": "REJECTED",
+      "application_status": "BANK_REJECTED",
+      "decided_at": "2026-11-09T10:00:00+04:00",
+      "rejection_reason_code": "PSK_LIMIT_EXCEEDED"
+    },
+    "valid": true,
+    "operation": "recordManualDecision",
+    "status": 200
   }
 ]
