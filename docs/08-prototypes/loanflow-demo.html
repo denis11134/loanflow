@@ -227,9 +227,10 @@
     }
 
     function startSigning() {
-      if (state.application !== "APPROVED" || !state.offerDeadline || state.now >= state.offerDeadline) return;
+      if (state.application !== "APPROVED" || !state.offerDeadline || state.now >= state.offerDeadline ||
+          (fixture.highPdn && !state.pdnWarning)) return;
       state.application = "SIGNING_IN_PROGRESS";
-      state.attempt = { deadline: state.now + 5 * minute, resends: 0, verifying: false };
+      state.attempt = { id: ++state.attemptSeq, deadline: state.now + 5 * minute, resends: 0, verifying: false };
       state.termsOpen = false;
     }
 
@@ -244,8 +245,8 @@
       state.outbox = { id: instructionId, attempted: false, finished: false };
     }
 
-    function sign() {
-      if (!state.attempt || state.application !== "SIGNING_IN_PROGRESS") return;
+    function sign(attemptId = state.attempt?.id) {
+      if (!state.attempt || state.attempt.id !== attemptId || state.application !== "SIGNING_IN_PROGRESS") return;
       if (state.now >= Math.min(state.attempt.deadline, state.offerDeadline)) return;
       state.application = "CONTRACT_SIGNED";
       state.attempt = null;
@@ -301,19 +302,31 @@
     }
 
     function canClose() {
-      return canReconcile() && (closeableResults.includes(state.lastRead) || state.closeResponseLost);
+      return canReconcile() && (Boolean(state.closeCommand) || closeableResults.includes(state.reads.at(-1)?.result));
+    }
+
+    function completeRead(read) {
+      if (read.result !== "WAITING") return;
+      read.result = read.response;
+      if (read === state.reads.at(-1)) state.reconciliationResult = read.result;
+      // Терминальный итог применяется и от старого чтения; допуск — только по последнему номеру.
+      applyAbsResult(read.result, state.outbox.id);
+      if (state.outbox.finished) state.reconciliationResult = state.contract === "DISBURSED" ? "POSTED" : "CLOSED";
     }
 
     function readInstruction() {
       if (!canReconcile()) return;
-      state.lastRead = state.nextReadResult || state.abs;
+      const read = { seq: state.reads.length + 1, result: "WAITING", response: state.nextReadResult || state.abs };
+      state.reads.push(read);
       state.nextReadResult = null;
-      state.reconciliationResult = state.lastRead;
-      applyAbsResult(state.lastRead, state.outbox.id);
+      state.reconciliationResult = "WAITING";
+      if (!state.deferNextRead) completeRead(read);
+      state.deferNextRead = false;
     }
 
     function closeInstruction() {
       if (!canClose()) return;
+      state.closeCommand ??= { authorizedReadSeq: state.reads.at(-1).seq, acceptedAt: state.now };
       recordAbsResult("CLOSED");
       if (fixture.loseCloseResponse && !state.closeResponseLost) {
         state.closeResponseLost = true;
@@ -328,9 +341,11 @@
       fixture = fixtures[key];
       state = {
         now: startTime, application: "DRAFT", amount: fixture.amount ?? 120_000, term: 12,
-        offerDeadline: null, attempt: null, contract: null, identified: false, abs: "NOT_FOUND",
+        offerDeadline: null, attempt: null, attemptSeq: 0, contract: null, identifiedUntil: null, abs: "NOT_FOUND",
+        reads: [], closeCommand: null, submittedAt: null,
       };
       notice = "";
+      if ((fixture.stage && fixture.stage !== "DRAFT") || fixture.abs) state.submittedAt = startTime;
       if (fixture.stage === "SCORING") state.application = "SCORING";
       if (fixture.stage === "UNDERWRITING") {
         enterQueue();
@@ -400,7 +415,7 @@
         <p>${hours
           ? `После подписания действует охлаждение ${hours} ч. В этот период можно отказаться от получения кредита в приложении или через КЦ.`
           : "Выдача начнётся сразу после подписания. После запуска выдачи отказаться от получения кредита нельзя."}</p>
-        ${state.pdnWarning ? '<p class="warning">Ваш показатель долговой нагрузки выше 50%. Оцените, сможете ли вы вносить платежи по кредиту.</p>' : ""}
+        ${fixture.highPdn ? '<p id="pdn-notice" class="warning">Ваш показатель долговой нагрузки выше 50%. Оцените, сможете ли вы вносить платежи по кредиту.</p>' : ""}
         ${state.termsOpen ? offer() : button("showTerms", "Посмотреть ИУ")}
         ${actions(button("startSigning", "Подписать", "primary"), button("cancelApplication", "Отменить заявку", "danger"))}`;
     }
@@ -472,7 +487,7 @@
       const stage = state.contract || state.application;
       const heading = `<h3>${labels[stage]}</h3>${status(stage)}`;
       if (stage === "COOLING_OFF") {
-        const controls = state.identified
+        const controls = isIdentified()
           ? '<p>Клиент идентифицирован.</p>' + actions(button("cancelCooling", "Оформить отказ от получения кредита", "danger"))
           : "<p>Для оформления отказа идентифицируйте клиента.</p>";
         return heading + coolingTime() + controls;
@@ -494,35 +509,38 @@
     function underwriter() {
       if (state.application !== "UNDERWRITING") return "<p>В очереди нет заявок на ручное рассмотрение.</p>";
       return `<h3>Заявка ${applicationId}</h3>${status(state.application)}
-        ${facts([["Дедлайн SLA", time(state.slaDeadline)]])}
+        ${facts([["Сумма", money(state.amount)], ["Срок", `${state.term} мес.`],
+          ["Момент подачи", time(state.submittedAt)], ["Дедлайн SLA", time(state.slaDeadline)]])}
         ${state.escalated ? '<p class="warning">SLA нарушен. Заявка эскалирована руководителю.</p>' : ""}
         ${actions(button("approve", "Одобрить", "primary"), button("reject", "Отказать", "danger"))}`;
     }
 
     function reconciliation() {
       if (!state.outbox?.attempted) return "<p>Распоряжений для ручной сверки нет.</p>";
-      if (state.outbox.finished && !state.reconciliationResult) return "<p>Распоряжений для ручной сверки нет.</p>";
       const outcomes = {
+        WAITING: "Ответ последнего зарегистрированного чтения ещё не получен.",
         NOT_FOUND: "Запись по распоряжению не найдена. Сверка остаётся открытой.",
         PENDING: "Распоряжение в обработке. Сверка остаётся открытой.",
         POSTED: "Зачисление подтверждено.",
         CLOSED: "Распоряжение окончательно закрыто. Исполнение заблокировано.",
-        TIMEOUT: state.closeResponseLost
+        TIMEOUT: state.closeCommand
           ? "АБС не ответила на чтение. Можно прочитать снова или повторить ранее принятую команду закрытия."
           : "АБС не ответила на чтение. Для закрытия нужен новый результат чтения.",
-        CONFLICT: state.closeResponseLost
+        CONFLICT: state.closeCommand
           ? "АБС вернула конфликт без подтверждения итога. Прочитайте состояние или повторите ранее принятую команду."
           : "АБС вернула конфликт без подтверждения итога. Прочитайте состояние снова.",
         CLOSE_TIMEOUT: "Ответ на закрытие не получен. Прочитайте состояние или повторите команду по тому же распоряжению.",
       };
-      const result = state.reconciliationResult;
+      const result = state.reconciliationResult || (state.outbox.finished ? state.abs : null);
       const resultText = result ? `<p><code>${result}</code> · ${outcomes[result]}</p>` : "<p>Прочитайте состояние исходного распоряжения.</p>";
       const controls = state.outbox.finished ? "" : actions(
         button("readInstruction", "Прочитать состояние АБС", "primary"),
-        canClose() ? button("closeInstruction", state.closeResponseLost
+        canClose() ? button("closeInstruction", state.closeCommand
           ? "Повторить закрытие" : "Запросить окончательное закрытие", "danger") : "",
       );
-      return facts([["Распоряжение", `<code>${state.outbox.id}</code>`]]) + resultText + controls;
+      return facts([["Распоряжение", `<code>${state.outbox.id}</code>`],
+        ["Последнее чтение", state.reads.length ? `№ ${state.reads.at(-1).seq} · ${state.reads.at(-1).result}` : "Нет"],
+        ["Команда закрытия принята", state.closeCommand ? "Да" : "Нет"]]) + resultText + controls;
     }
 
     const screens = { mobile, contact, branch, underwriter, reconciliation };
@@ -539,7 +557,8 @@
           state.attempt.screenClosed = !state.attempt.screenClosed;
         },
         resendSms() {
-          if (!state.attempt || state.attempt.verifying || state.attempt.resends >= 2) return;
+          if (!state.attempt || state.attempt.verifying || state.attempt.resends >= 2 ||
+              state.now >= Math.min(state.attempt.deadline, state.offerDeadline)) return;
           state.attempt.resends += 1;
           notice = "SMS отправлено повторно. Срок действия кода не изменился.";
         },
@@ -567,8 +586,12 @@
       reconciliation: { readInstruction, closeInstruction },
     };
 
+    function isIdentified() {
+      return state.identifiedUntil !== null && state.now < state.identifiedUntil;
+    }
+
     function cancelCooling() {
-      if (state.contract !== "COOLING_OFF" || (role === "contact" && !state.identified)) return;
+      if (state.contract !== "COOLING_OFF" || (role === "contact" && !isIdentified())) return;
       state.contract = "CANCELED_BY_CLIENT";
       notice = "Отказ от получения кредита подтверждён.";
     }
@@ -596,13 +619,15 @@
       [() => state.attempt && state.attempt.deadline < state.offerDeadline, "К дедлайну попытки SMS", () => advanceTo(state.attempt.deadline)],
       [() => ["APPROVED", "SIGNING_IN_PROGRESS"].includes(state.application) && state.offerDeadline,
         "К дедлайну предложения", () => advanceTo(state.offerDeadline)],
-      [() => state.contract === "COOLING_OFF" && !state.identified, "Имитировать успешную идентификацию клиента в КЦ", () => {
-        state.identified = true;
+      [() => state.contract === "COOLING_OFF" && !isIdentified(), "Имитировать успешную идентификацию клиента в КЦ", () => {
+        state.identifiedUntil = state.now + 5 * minute;
       }],
+      [() => state.contract === "COOLING_OFF" && isIdentified(), "К окончанию идентификации КЦ", () => advanceTo(state.identifiedUntil)],
       [() => state.contract === "COOLING_OFF", "К окончанию охлаждения", () => advanceTo(state.coolingUntil)],
       [() => state.contract === "DISBURSEMENT_PROCESSING" && !state.outbox.attempted, "АБС подтвердила зачисление", () => sendInstruction("POSTED")],
       [() => state.contract === "DISBURSEMENT_PROCESSING" && !state.outbox.attempted, "АБС подтвердила окончательное закрытие", () => sendInstruction("CLOSED")],
       [() => state.contract === "DISBURSEMENT_PROCESSING" && !state.outbox.attempted, "Ответ АБС потерян · передать на сверку", () => sendInstruction("TIMEOUT")],
+      [() => canReconcile() && !state.deferNextRead, "Задержать ответ следующего чтения", () => { state.deferNextRead = true; }],
       [() => canReconcile() && !state.nextReadResult, "Следующее чтение АБС завершится таймаутом", () => {
         state.nextReadResult = "TIMEOUT";
       }],
@@ -634,18 +659,19 @@
       screenTitle.textContent = roles[role];
       noticeElement.textContent = notice;
       noticeElement.hidden = !notice;
-      if (role === "mobile" && state.application === "APPROVED" && state.offerDeadline &&
-          fixture.highPdn && !state.pdnWarning) {
+      roleContent.innerHTML = screens[role]();
+      if (role === "mobile" && roleContent.querySelector("#pdn-notice") && !state.pdnWarning) {
         state.pdnWarning = { shownAt: state.now, version: "demo-1" };
       }
-      roleContent.innerHTML = screens[role]();
 
       const details = [["Время стенда", time(state.now)], ["Резерв МПЛ", reserveState()]];
       if (state.attempt && !state.attempt.verifying) details.push(["Код учебной SMS", `<code>${smsCode}</code>`]);
       if (state.nextReadResult) details.push(["Следующее чтение АБС", state.nextReadResult]);
       labState.innerHTML = facts(details);
       labEvents.replaceChildren();
-      for (const [available, label, run] of events) {
+      const readEvents = state.reads.filter(read => read.result === "WAITING").map(read =>
+        [() => read.result === "WAITING", `Получить ответ чтения № ${read.seq}`, () => completeRead(read)]);
+      for (const [available, label, run] of [...events, ...readEvents]) {
         if (!available()) continue;
         const control = document.createElement("button");
         control.type = "button";
@@ -705,6 +731,7 @@
           notice = fixture.otherApplication ? "У вас уже есть активная заявка." : "У вас уже есть действующий договор.";
         } else {
           state.application = "SCORING";
+          state.submittedAt = state.now;
           notice = "Заявка принята.";
           document.querySelector("#simulation").open = true;
         }
