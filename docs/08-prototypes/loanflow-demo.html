@@ -87,11 +87,17 @@
   <script>
     "use strict";
 
-    const minute = 60_000;
+    const second = 1_000;
+    const minute = 60 * second;
     const hour = 60 * minute;
     const day = 24 * hour;
+    const samaraOffset = 4 * hour; // Смещение Europe/Samara для дат учебного набора.
+    const workIntervals = [[9 * hour, 13 * hour], [14 * hour, 18 * hour]];
+    const slaDuration = 60 * minute;
+    const readRecoveryWindow = 10 * second;
+    const externalTimeout = 2 * second;
+    const retryDelays = [second, 3 * second];
     const startTime = Date.parse("2026-11-09T10:00:00+04:00");
-    const smsCode = "123456";
     const annualRate = 0.2;
     const costLimit = 0.25;
     const applicationId = "APP-DEMO-001";
@@ -143,7 +149,9 @@
         selfBan: { name: "Отказ из-за самозапрета", stage: "SCORING", score: "selfBan" },
         noConsent: { name: "Отказ · нет действующего согласия", stage: "SCORING", score: "noConsent" },
         systemError: { name: "Технический сбой при оценке", stage: "SCORING", score: "error" },
+        amlTimeout: { name: "Оценка · три таймаута AML", stage: "SCORING", score: "timeout" },
         manual: { name: "Ручное рассмотрение", stage: "UNDERWRITING" },
+        manualFriday: { name: "SLA · вход в пятницу в 17:30", stage: "UNDERWRITING", at: "2026-11-06T17:30:00+04:00" },
         escalated: { name: "Ручное рассмотрение · SLA нарушен", stage: "UNDERWRITING", escalated: true },
         quota: { name: "Ручное одобрение · квоты нет", stage: "UNDERWRITING", score: "noQuota" },
         costLimit: { name: "ПСК выше тестового предела", stage: "SCORING", annualCost: 0.26 },
@@ -151,6 +159,8 @@
       "ИУ, SMS и охлаждение": {
         beforeTerms: { name: "Одобрено · ИУ ещё не предоставлены", stage: "APPROVED", termsReady: false },
         termsError: { name: "Сбой предоставления ИУ", stage: "APPROVED", termsReady: false, termsFail: true },
+        termsTimeout: { name: "ИУ · временная недоступность", stage: "APPROVED", termsReady: false, termsFail: "timeout" },
+        termsSaturday: { name: "ИУ · публикация в субботу в 12:00", stage: "APPROVED", at: "2026-11-07T12:00:00+04:00" },
         noCooling: { name: "ИУ · 49 999 ₽ без охлаждения", stage: "APPROVED", amount: 49_999 },
         lowerLimit: { name: "ИУ · 50 000 ₽ и предупреждение о ПДН", stage: "APPROVED", amount: 50_000, highPdn: true },
         upperLimit: { name: "ИУ · 200 000 ₽ с охлаждением 4 часа", stage: "APPROVED", amount: 200_000 },
@@ -183,25 +193,57 @@
       return state.offerDeadline || state.hadOffer ? "Освобождён" : "Отсутствует";
     }
 
-    function fiveWorkingDays(from) {
-      // Тестовый календарь содержит рабочие дни с понедельника по пятницу.
-      const zoneOffset = 4 * hour;
+    function isWorkingDate(timestamp, nonWorkingDates) {
+      const local = new Date(timestamp + samaraOffset);
+      return local.getUTCDay() >= 1 && local.getUTCDay() <= 5 &&
+        !nonWorkingDates.includes(local.toISOString().slice(0, 10));
+    }
+
+    function fiveWorkingDays(from, nonWorkingDates = []) {
       let left = 5;
       while (left > 0) {
         from += day;
-        const weekday = new Date(from + zoneOffset).getUTCDay();
-        if (weekday > 0 && weekday < 6) left -= 1;
+        if (isWorkingDate(from, nonWorkingDates)) left -= 1;
       }
       return from;
     }
 
+    function underwritingDeadline(from, nonWorkingDates = []) {
+      let midnight = Math.floor((from + samaraOffset) / day) * day - samaraOffset;
+      let remaining = slaDuration;
+      for (;; midnight += day) {
+        if (!isWorkingDate(midnight, nonWorkingDates)) continue;
+        for (const [open, close] of workIntervals) {
+          const start = Math.max(from, midnight + open);
+          const available = midnight + close - start;
+          if (available <= 0) continue;
+          if (remaining <= available) return start + remaining;
+          remaining -= available;
+        }
+      }
+    }
+
+    function simulateMandatoryTimeout() {
+      const retry = state.mandatoryRetry ??= { attempts: 0, nextAt: state.now };
+      if (state.now < retry.nextAt) return;
+      retry.attempts += 1;
+      advanceTo(state.now + externalTimeout);
+      if (retry.attempts > retryDelays.length) {
+        retry.nextAt = null;
+        state.application = "SYSTEM_ERROR";
+      } else {
+        retry.nextAt = state.now + retryDelays[retry.attempts - 1];
+      }
+    }
+
     function provideTerms() {
       if (state.application !== "APPROVED" || state.offerDeadline) return;
+      if (fixture.termsFail === "timeout") return simulateMandatoryTimeout();
       if (fixture.termsFail) {
         state.application = "SYSTEM_ERROR";
         return;
       }
-      state.offerDeadline = fiveWorkingDays(state.now);
+      state.offerDeadline = fiveWorkingDays(state.now, fixture.nonWorkingDates);
     }
 
     function approve() {
@@ -217,8 +259,7 @@
 
     function enterQueue() {
       state.application = "UNDERWRITING";
-      // Для демонстрации вход в очередь приходится на рабочий понедельник в 10:00.
-      state.slaDeadline = state.now + hour;
+      state.slaDeadline = underwritingDeadline(state.now, fixture.nonWorkingDates);
     }
 
     function coolingHours() {
@@ -230,7 +271,9 @@
       if (state.application !== "APPROVED" || !state.offerDeadline || state.now >= state.offerDeadline ||
           (fixture.highPdn && !state.pdnWarning)) return;
       state.application = "SIGNING_IN_PROGRESS";
-      state.attempt = { id: ++state.attemptSeq, deadline: state.now + 5 * minute, resends: 0, verifying: false };
+      const id = ++state.attemptSeq;
+      const code = String((123_455 + id) % 1_000_000).padStart(6, "0");
+      state.attempt = { id, code, deadline: state.now + 5 * minute, resends: 0, verifying: false };
       state.termsOpen = false;
     }
 
@@ -271,6 +314,11 @@
       if (state.contract === "COOLING_OFF" && state.now >= state.coolingUntil) {
         startDisbursement();
       }
+      for (const read of state.reads) {
+        if (read.result === "WAITING" && state.now >= readDeadline(read)) {
+          saveReadResult(read, "TIMEOUT");
+        }
+      }
     }
 
     function applyAbsResult(result, id) {
@@ -305,22 +353,45 @@
       return canReconcile() && (Boolean(state.closeCommand) || closeableResults.includes(state.reads.at(-1)?.result));
     }
 
+    function readDeadline(read) {
+      return read.callDeadline ?? read.registeredAt + readRecoveryWindow;
+    }
+
+    function saveReadResult(read, result) {
+      read.result = result;
+      if (!state.outbox.finished && read === state.reads.at(-1)) state.reconciliationResult = result;
+    }
+
+    function startReadCall(read) {
+      if (read.result !== "WAITING" || read.callDeadline !== null) return;
+      read.callDeadline = Math.min(state.now + externalTimeout, readDeadline(read));
+    }
+
     function completeRead(read) {
-      if (read.result !== "WAITING") return;
-      read.result = read.response;
-      if (read === state.reads.at(-1)) state.reconciliationResult = read.result;
+      startReadCall(read);
+      if (read.callDeadline === null || read.delivered) return;
+      read.delivered = true;
+      if (read.result === "WAITING") saveReadResult(read, read.response);
       // Терминальный итог применяется и от старого чтения; допуск — только по последнему номеру.
-      applyAbsResult(read.result, state.outbox.id);
+      applyAbsResult(read.response, state.outbox.id);
       if (state.outbox.finished) state.reconciliationResult = state.contract === "DISBURSED" ? "POSTED" : "CLOSED";
     }
 
     function readInstruction() {
       if (!canReconcile()) return;
-      const read = { seq: state.reads.length + 1, result: "WAITING", response: state.nextReadResult || state.abs };
+      const read = { seq: state.reads.length + 1, registeredAt: state.now, callDeadline: null,
+        result: "WAITING", response: state.nextReadResult || state.abs };
       state.reads.push(read);
       state.nextReadResult = null;
       state.reconciliationResult = "WAITING";
-      if (!state.deferNextRead) completeRead(read);
+      if (!state.deferNextRead) {
+        if (read.response === "TIMEOUT") {
+          startReadCall(read);
+          advanceTo(read.callDeadline);
+        } else {
+          completeRead(read);
+        }
+      }
       state.deferNextRead = false;
     }
 
@@ -339,13 +410,14 @@
 
     function loadScenario(key) {
       fixture = fixtures[key];
+      const now = fixture.at ? Date.parse(fixture.at) : startTime;
       state = {
-        now: startTime, application: "DRAFT", amount: fixture.amount ?? 120_000, term: 12,
+        now, application: "DRAFT", amount: fixture.amount ?? 120_000, term: 12,
         offerDeadline: null, attempt: null, attemptSeq: 0, contract: null, identifiedUntil: null, abs: "NOT_FOUND",
         reads: [], closeCommand: null, submittedAt: null,
       };
       notice = "";
-      if ((fixture.stage && fixture.stage !== "DRAFT") || fixture.abs) state.submittedAt = startTime;
+      if ((fixture.stage && fixture.stage !== "DRAFT") || fixture.abs) state.submittedAt = now;
       if (fixture.stage === "SCORING") state.application = "SCORING";
       if (fixture.stage === "UNDERWRITING") {
         enterQueue();
@@ -603,16 +675,25 @@
         state.rejection = fixture.score;
       } else if (fixture.score === "error") {
         state.application = "SYSTEM_ERROR";
+      } else if (fixture.score === "timeout") {
+        simulateMandatoryTimeout();
       } else {
         approve();
       }
     }
 
     const events = [
-      [() => state.application === "SCORING", "Завершить оценку", score],
+      [() => state.application === "SCORING" && !state.mandatoryRetry, "Завершить оценку", score],
       [() => state.application === "SCORING" && !fixture.score, "Направить на ручное рассмотрение", enterQueue],
       [() => state.application === "UNDERWRITING" && !state.escalated, "Перейти за дедлайн SLA", () => advanceTo(state.slaDeadline + minute)],
-      [() => state.application === "APPROVED" && !state.offerDeadline, "Завершить предоставление ИУ", provideTerms],
+      [() => state.application === "APPROVED" && !state.offerDeadline && !state.mandatoryRetry,
+        "Завершить предоставление ИУ", provideTerms],
+      [() => ["SCORING", "APPROVED"].includes(state.application) && state.mandatoryRetry?.nextAt != null,
+        "К повтору обязательной операции", () => {
+          advanceTo(state.mandatoryRetry.nextAt);
+          if (state.application === "SCORING") score();
+          else provideTerms();
+        }],
       [() => state.attempt && !state.attempt.verifying, "Имитировать сбой доставки SMS", () =>
         endAttempt("Не удалось доставить SMS. Начните подписание заново.")],
       [() => state.attempt?.verifying, "Вернуть успешный результат проверки кода", sign],
@@ -665,12 +746,19 @@
       }
 
       const details = [["Время стенда", time(state.now)], ["Резерв МПЛ", reserveState()]];
-      if (state.attempt && !state.attempt.verifying) details.push(["Код учебной SMS", `<code>${smsCode}</code>`]);
+      if (state.attempt && !state.attempt.verifying) details.push(["Код учебной SMS", `<code>${state.attempt.code}</code>`]);
+      if (state.mandatoryRetry) details.push(["Попытки обязательной операции", state.mandatoryRetry.attempts]);
       if (state.nextReadResult) details.push(["Следующее чтение АБС", state.nextReadResult]);
       labState.innerHTML = facts(details);
       labEvents.replaceChildren();
-      const readEvents = state.reads.filter(read => read.result === "WAITING").map(read =>
-        [() => read.result === "WAITING", `Получить ответ чтения № ${read.seq}`, () => completeRead(read)]);
+      const readEvents = state.reads.flatMap(read => [
+        [() => read.result === "WAITING" && read.callDeadline === null,
+          `Возобновить чтение № ${read.seq}`, () => startReadCall(read)],
+        [() => read.result === "WAITING", `К сроку чтения № ${read.seq}`, () => advanceTo(readDeadline(read))],
+        [() => !read.delivered && (read.result === "WAITING" ||
+          (read.result === "TIMEOUT" && read.callDeadline !== null && read.response !== "TIMEOUT")),
+        `Получить ответ чтения № ${read.seq}`, () => completeRead(read)],
+      ]);
       for (const [available, label, run] of [...events, ...readEvents]) {
         if (!available()) continue;
         const control = document.createElement("button");
@@ -738,7 +826,7 @@
       }
       if (event.target.id === "sms-form" && state.attempt && !state.attempt.verifying) {
         const code = new FormData(event.target).get("sms");
-        if (code !== smsCode) {
+        if (code !== state.attempt.code) {
           endAttempt("Код неверный. Начните подписание заново.");
         } else if (fixture.smsUnknown) {
           state.attempt.verifying = true;

@@ -151,3 +151,88 @@ def test_late_terminal_read_and_later_nonterminal(page):
     event(page, 'Получить ответ чтения № 1')
     assert page.evaluate('state.contract') == 'DISBURSEMENT_FAILED'
     assert 'Распоряжение окончательно закрыто' in page.locator('#role-content').inner_text()
+
+
+def test_samara_working_calendar(page):
+    load(page, 'manualFriday', 'underwriter')
+    assert '09.11.2026, 09:30' in page.locator('#role-content').inner_text()
+    page.evaluate('advanceTo(state.slaDeadline); render()')
+    assert 'SLA нарушен' not in page.locator('#role-content').inner_text()
+    event(page, 'Перейти за дедлайн SLA')
+    assert 'SLA нарушен' in page.locator('#role-content').inner_text()
+    load(page, 'termsSaturday')
+    assert '13.11.2026, 12:00' in page.locator('#role-content').inner_text()
+    deadline = page.evaluate('state.offerDeadline')
+    action(page, 'showTerms').click()
+    action(page, 'hideTerms').click()
+    action(page, 'showTerms').click()
+    assert page.evaluate('state.offerDeadline') == deadline
+    assert page.evaluate('''() => new Date(underwritingDeadline(
+        Date.parse('2026-11-06T17:30:00+04:00'), ['2026-11-09'])).toISOString()''') == '2026-11-10T05:30:00.000Z'
+    assert page.evaluate('''() => new Date(underwritingDeadline(
+        Date.parse('2026-11-09T12:30:00+04:00'))).toISOString()''') == '2026-11-09T10:30:00.000Z'
+    assert page.evaluate('''() => new Date(fiveWorkingDays(
+        Date.parse('2026-11-07T12:00:00+04:00'), ['2026-11-09'])).toISOString()''') == '2026-11-16T08:00:00.000Z'
+
+
+def test_sms_resends_preserve_code_for_attempt(page):
+    load(page, 'noCooling')
+    action(page, 'startSigning').click()
+    attempt_id, code, deadline = page.evaluate('[state.attempt.id, state.attempt.code, state.attempt.deadline]')
+    for _ in range(2):
+        action(page, 'resendSms').click()
+        assert page.evaluate('[state.attempt.id, state.attempt.code, state.attempt.deadline]') == [attempt_id, code, deadline]
+    assert action(page, 'resendSms').is_disabled()
+    event(page, 'К дедлайну попытки')
+    action(page, 'startSigning').click()
+    assert page.evaluate('state.attempt.code') != code
+    page.locator('#sms').fill(code)
+    page.locator('#sms-form button[type="submit"]').click()
+    assert page.evaluate('state.application') == 'APPROVED'
+    assert page.evaluate('state.contract') is None
+
+
+@pytest.mark.parametrize('scenario,first,active', [
+    ('amlTimeout', 'Завершить оценку', 'SCORING'),
+    ('termsTimeout', 'Завершить предоставление ИУ', 'APPROVED'),
+])
+def test_mandatory_timeout_schedule(page, scenario, first, active):
+    load(page, scenario)
+    start = page.evaluate('state.now')
+    event(page, first)
+    assert page.evaluate('[state.application, state.now, state.mandatoryRetry.nextAt]') == [active, start + 2000, start + 3000]
+    event(page, 'К повтору обязательной операции')
+    assert page.evaluate('[state.application, state.now, state.mandatoryRetry.nextAt]') == [active, start + 5000, start + 8000]
+    event(page, 'К повтору обязательной операции')
+    assert page.evaluate('[state.application, state.now, state.mandatoryRetry.attempts]') == ['SYSTEM_ERROR', start + 10000, 3]
+    assert 'К повтору обязательной операции' not in page.locator('#lab-events').inner_text()
+    if active == 'APPROVED':
+        assert page.evaluate('reserveState()') == 'Освобождён'
+
+
+@pytest.mark.parametrize('scenario,final', [('pending', 'DISBURSEMENT_PROCESSING'), ('posted', 'DISBURSED')])
+def test_recovered_read_timeout_and_late_result(page, scenario, final):
+    load(page, scenario, 'reconciliation')
+    event(page, 'Задержать ответ следующего чтения')
+    action(page, 'readInstruction').click()
+    registered = page.evaluate('state.reads[0].registeredAt')
+    page.evaluate('(ts) => { advanceTo(ts); render(); }', registered + 9000)
+    event(page, 'Возобновить чтение № 1')
+    assert page.evaluate('state.reads[0].callDeadline') == registered + 10000
+    event(page, 'К сроку чтения № 1')
+    assert page.evaluate('state.reads.map(({seq, result}) => [seq, result])') == [[1, 'TIMEOUT']]
+    event(page, 'Получить ответ чтения № 1')
+    assert page.evaluate('state.reads[0].result') == 'TIMEOUT'
+    assert page.evaluate('state.contract') == final
+    assert action(page, 'closeInstruction').count() == 0
+
+
+def test_read_recovery_window_can_expire_before_call(page):
+    load(page, 'pending', 'reconciliation')
+    event(page, 'Задержать ответ следующего чтения')
+    action(page, 'readInstruction').click()
+    event(page, 'К сроку чтения № 1')
+    assert page.evaluate('state.now - state.reads[0].registeredAt') == 10000
+    assert page.evaluate('[state.reads[0].result, state.reads[0].callDeadline]') == ['TIMEOUT', None]
+    assert 'Возобновить чтение' not in page.locator('#lab-events').inner_text()
+    assert action(page, 'closeInstruction').count() == 0
