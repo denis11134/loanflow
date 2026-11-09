@@ -47,6 +47,7 @@ markdown_extensions:
 
 nav:
   - Главная: index.md
+  - Проверки перед реализацией: verification.md
   - Бизнес-контекст:
       - 01-business/index.md
       - Протокол интервью: 01-business/1.1-interview-protocol.md

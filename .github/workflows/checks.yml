@@ -1,0 +1,58 @@
+name: Проверки основы LoanFlow
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  technical:
+    name: Документация, PostgreSQL и прототип
+    runs-on: ubuntu-24.04
+    env:
+      PG_BINDIR: /usr/lib/postgresql/18/bin
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            requirements-checks.txt
+            requirements-checks.lock.txt
+            requirements-docs.txt
+      - run: python -m pip install -r requirements-checks.txt
+      - name: PostgreSQL 18 из официального репозитория
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl --fail --silent --show-error https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          echo 'deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main' | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-18
+      - run: python -m playwright install --with-deps chromium
+      - run: python scripts/check.py --technical
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: technical-results
+          path: test-results/
+  contracts:
+    name: Контракты — блокирует при известных дефектах
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            requirements-checks.txt
+            requirements-checks.lock.txt
+            requirements-docs.txt
+      - run: python -m pip install -r requirements-checks.txt
+      - run: python -m pytest -q --tb=short -m contracts --require-ready --junitxml=test-results/contracts.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contract-results
+          path: test-results/

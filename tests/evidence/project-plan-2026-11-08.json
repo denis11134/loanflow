@@ -1,0 +1,254 @@
+{
+  "source": "https://github.com/users/denis11134/projects/1",
+  "retrieved_on": "2026-11-08",
+  "items": [
+    {
+      "content": {
+        "body": "структура проекта, CLAUDE.md, сайт документации MkDocs",
+        "number": 1,
+        "repository": "denis11134/loanflow",
+        "title": "0.1 Репозиторий",
+        "type": "Issue",
+        "url": "https://github.com/denis11134/loanflow/issues/1"
+      },
+      "id": "PVTI_lAHOBXUqgc4Boo-1zhDWY2w",
+      "milestone": {
+        "description": "",
+        "dueOn": "",
+        "title": "Этап 0. Подготовка"
+      },
+      "repository": "https://github.com/denis11134/loanflow",
+      "status": "Done",
+      "title": "0.1 Репозиторий"
+    },
+    {
+      "content": {
+        "body": "доска в GitHub Projects, майлстоуны и issues по плану",
+        "number": 2,
+        "repository": "denis11134/loanflow",
+        "title": "0.2 Бэклог",
+        "type": "Issue",
+        "url": "https://github.com/denis11134/loanflow/issues/2"
+      },
+      "id": "PVTI_lAHOBXUqgc4Boo-1zhDWZBI",
+      "milestone": {
+        "description": "",
+        "dueOn": "",
+        "title": "Этап 0. Подготовка"
+      },
+      "repository": "https://github.com/denis11134/loanflow",
+      "status": "Done",
+      "title": "0.2 Бэклог"
+    },
+    {
+      "content": {
+        "body": "протокол интервью и выявленные потребности",
+        "number": 3,
+        "repository": "denis11134/loanflow",
+        "title": "1.1 Интервью с заказчиком",
+        "type": "Issue",
+        "url": "https://github.com/denis11134/loanflow/issues/3"
+      },
+      "id": "PVTI_lAHOBXUqgc4Boo-1zhDWZIA",
+      "milestone": {
+        "description": "",
+        "dueOn": "",
+        "title": "Этап 1. Бизнес-анализ"
+      },
+      "repository": "https://github.com/denis11134/loanflow",
+      "status": "Done",
+      "title": "1.1 Интервью с заказчиком"
+    },
+    {
+      "content": {
+        "body": "глоссарий и обзор регуляторики",
+        "number": 4,
+        "repository": "denis11134/loanflow",
+        "title": "1.2 Предметная область",
+        "type": "Issue",
+        "url": "https://github.com/denis11134/loanflow/issues/4"
+      },
+      "id": "PVTI_lAHOBXUqgc4Boo-1zhDWZOc",
+      "milestone": {
+        "description": "",
+        "dueOn": "",
+        "title": "Этап 1. Бизнес-анализ"
+      },
+      "repository": "https://github.com/denis11134/loanflow",
+      "status": "Done",
+      "title": "1.2 Предметная область"
+    },
+    {
+      "content": {
+        "body": "цели, стейкхолдеры, метрики, границы проекта",
+        "number": 5,
+        "repository": "denis11134/loanflow",
+        "title": "1.3 Vision & Scope / BRD",
+        "type": "Issue",
+        "url": "https://github.com/denis11134/loanflow/issues/5"
+      },
+      "id": "PVTI_lAHOBXUqgc4Boo-1zhDWZUY",
+      "milestone": {
+        "description": "",
+        "dueOn": "",
+        "title": "Этап 1. Бизнес-анализ"
+      },
+      "repository": "https://github.com/denis11134/loanflow",
+      "status": "Done",
+      "title": "1.3 Vision & Scope / BRD"
+    },
+    {
+      "content": {
+        "body": "BPMN-схемы «как есть» и «как будет»",
+        "number": 6,
+        "repository": "denis11134/loanflow",
+        "title": "1.4 Процессы",
+        "type": "Issue",
+        "url": "https://github.com/denis11134/loanflow/issues/6"
+      },
+      "id": "PVTI_lAHOBXUqgc4Boo-1zhDWZZo",
+      "milestone": {
+        "description": "",
+        "dueOn": "",
+        "title": "Этап 1. Бизнес-анализ"
+      },
+      "repository": "https://github.com/denis11134/loanflow",
+      "status": "Done",
+      "title": "1.4 Процессы"
+    },
+    {
+      "content": {
+        "body": "UML-диаграмма состояний заявки",
+        "number": 7,
+        "repository": "denis11134/loanflow",
+        "title": "1.5 Статусная модель",
+        "type": "Issue",
+        "url": "https://github.com/denis11134/loanflow/issues/7"
+      },
+      "id": "PVTI_lAHOBXUqgc4Boo-1zhDWZfA",
+      "milestone": {
+        "description": "",
+        "dueOn": "",
+        "title": "Этап 1. Бизнес-анализ"
+      },
+      "repository": "https://github.com/denis11134/loanflow",
+      "status": "Done",
+      "title": "1.5 Статусная модель"
+    },
+    {
+      "content": {
+        "body": "user stories с критериями приёмки, use cases, бизнес-правила, ФТ",
+        "number": 8,
+        "repository": "denis11134/loanflow",
+        "title": "1.6 Требования",
+        "type": "Issue",
+        "url": "https://github.com/denis11134/loanflow/issues/8"
+      },
+      "id": "PVTI_lAHOBXUqgc4Boo-1zhDWZlQ",
+      "milestone": {
+        "description": "",
+        "dueOn": "",
+        "title": "Этап 1. Бизнес-анализ"
+      },
+      "repository": "https://github.com/denis11134/loanflow",
+      "status": "Done",
+      "title": "1.6 Требования"
+    },
+    {
+      "content": {
+        "body": "экраны анкеты клиента и кабинета андеррайтера в Figma",
+        "number": 9,
+        "repository": "denis11134/loanflow",
+        "title": "1.7 Прототипы",
+        "type": "Issue",
+        "url": "https://github.com/denis11134/loanflow/issues/9"
+      },
+      "id": "PVTI_lAHOBXUqgc4Boo-1zhDWZpQ",
+      "milestone": {
+        "description": "",
+        "dueOn": "",
+        "title": "Этап 1. Бизнес-анализ"
+      },
+      "repository": "https://github.com/denis11134/loanflow",
+      "status": "Done",
+      "title": "1.7 Прототипы"
+    },
+    {
+      "content": {
+        "body": "концептуальная и логическая модель данных",
+        "number": 10,
+        "repository": "denis11134/loanflow",
+        "title": "2.1 ER-модель",
+        "type": "Issue",
+        "url": "https://github.com/denis11134/loanflow/issues/10"
+      },
+      "id": "PVTI_lAHOBXUqgc4Boo-1zhDWZsw",
+      "milestone": {
+        "description": "",
+        "dueOn": "",
+        "title": "Этап 2. Данные"
+      },
+      "repository": "https://github.com/denis11134/loanflow",
+      "status": "Done",
+      "title": "2.1 ER-модель"
+    },
+    {
+      "content": {
+        "body": "DDL, миграции, PostgreSQL в Docker",
+        "number": 11,
+        "repository": "denis11134/loanflow",
+        "title": "2.2 Физическая модель",
+        "type": "Issue",
+        "url": "https://github.com/denis11134/loanflow/issues/11"
+      },
+      "id": "PVTI_lAHOBXUqgc4Boo-1zhDWZwA",
+      "milestone": {
+        "description": "",
+        "dueOn": "",
+        "title": "Этап 2. Данные"
+      },
+      "repository": "https://github.com/denis11134/loanflow",
+      "status": "Done",
+      "title": "2.2 Физическая модель"
+    },
+    {
+      "content": {
+        "body": "реалистичный датасет на несколько тысяч заявок",
+        "number": 12,
+        "repository": "denis11134/loanflow",
+        "title": "2.3 Тестовые данные",
+        "type": "Issue",
+        "url": "https://github.com/denis11134/loanflow/issues/12"
+      },
+      "id": "PVTI_lAHOBXUqgc4Boo-1zhDWZzg",
+      "milestone": {
+        "description": "",
+        "dueOn": "",
+        "title": "Этап 2. Данные"
+      },
+      "repository": "https://github.com/denis11134/loanflow",
+      "status": "Done",
+      "title": "2.3 Тестовые данные"
+    },
+    {
+      "content": {
+        "body": "15–20 аналитических запросов",
+        "number": 13,
+        "repository": "denis11134/loanflow",
+        "title": "2.4 SQL-практикум",
+        "type": "Issue",
+        "url": "https://github.com/denis11134/loanflow/issues/13"
+      },
+      "id": "PVTI_lAHOBXUqgc4Boo-1zhDWZ2k",
+      "milestone": {
+        "description": "",
+        "dueOn": "",
+        "title": "Этап 2. Данные"
+      },
+      "repository": "https://github.com/denis11134/loanflow",
+      "status": "Done",
+      "title": "2.4 SQL-практикум"
+    }
+  ],
+  "comments": "Комментарии к issues 6–13 прочитаны: пусты."
+}
