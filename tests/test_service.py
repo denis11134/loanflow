@@ -14,8 +14,10 @@ from uuid import uuid4
 import psycopg
 import pytest
 import uvicorn
+from reportlab.pdfbase.ttfonts import TTFError
 
 from api_support import document, operations, response_schema, validator
+from services.loanflow import applications, assessment
 from services.loanflow.api import create_app
 from services.loanflow.seed import DEMO, seed
 from services.loanflow.signing import stand_code
@@ -464,6 +466,96 @@ def test_failed_publication_releases_reserve(setup_stand, faults, steps):
         assert stand.request("GET", f"/applications/{app}", 200)["status"] == "SYSTEM_ERROR"
         assert_reserve(stand, "RELEASED")
         assert not stand.sql("SELECT * FROM individual_terms")
+
+
+@pytest.mark.parametrize(("errors", "status"), [
+    pytest.param([TTFError], "SYSTEM_ERROR", id="permanent"),
+    pytest.param([TimeoutError] * 2, "APPROVED", id="recovered"),
+    pytest.param([TimeoutError] * 3, "SYSTEM_ERROR", id="exhausted"),
+])
+def test_publication_handles_generator_exceptions(setup_stand, monkeypatch, errors, status):
+    stand = setup_stand
+    font = assessment.terms_font
+    outcomes = iter(errors)
+    retry = errors[0] is TimeoutError
+
+    def generate_font():
+        error = next(outcomes, None)
+        if error:
+            raise error("synthetic rendering failure")
+        return font()
+
+    monkeypatch.setattr(assessment, "terms_font", generate_font)
+    with stand.serve():
+        app = submit(stand)
+        path = f"/applications/{app}"
+        process(stand, "AML", "CREDIT_REPORT", "DE")
+        assert stand.request("GET", path, 200)["offer_availability"] == "PREPARING"
+        assert_reserve(stand, "HELD")
+
+        if retry:
+            for count, delay in enumerate((1, 3), start=1):
+                process(stand, "PUBLISH")
+                next_at = stand.clock() + timedelta(seconds=delay)
+                assert stand.sql("SELECT failures,run_at FROM service_job WHERE kind='PUBLISH'") == [
+                    {"failures": count, "run_at": next_at}]
+                assert stand.request("GET", path, 200)["offer_availability"] == "PREPARING"
+                assert_reserve(stand, "HELD")
+                assert not worker(stand).run_once("PUBLISH")
+                stand.clock.at = next_at
+
+        process(stand, "PUBLISH")
+        assert stand.request("GET", path, 200)["status"] == status
+        assert not stand.sql("SELECT 1 FROM service_job WHERE kind='PUBLISH'")
+        if status == "SYSTEM_ERROR":
+            assert_reserve(stand, "RELEASED")
+            assert not stand.sql("SELECT 1 FROM individual_terms")
+        else:
+            assert_reserve(stand, "HELD")
+            assert stand.request("GET", path + "/offer", 200)["state"] == "AVAILABLE"
+        assert stand.sql("""SELECT sequence FROM stand_adapter_call
+                            WHERE operation='PUBLISH' ORDER BY sequence""") == [
+            {"sequence": number} for number in ([1, 2, 3] if retry else [1])]
+
+
+@pytest.mark.parametrize("single", [True, False], ids=["card", "list"])
+def test_application_read_during_signing_transition(setup_stand, monkeypatch, single):
+    stand = setup_stand
+    entered, proceed = threading.Event(), threading.Event()
+    pause = pause_at("application_read", entered, proceed)
+    original = applications.view
+
+    def paused_view(ctx, row):
+        if row["status"] == "APPROVED":
+            pause("application_read")
+        return original(ctx, row)
+
+    with stand.serve():
+        app, offer = prepare_offer(stand)
+        path = f"/applications/{app}"
+        stand.request("PUT", f"{path}/terms/{offer['terms_id']}/pdn-notice-acknowledgement",
+                      200, body={"notice_version": offer["pdn_notice"]["version"]})
+        read_path = path if single else "/applications"
+        before = stand.request("GET", read_path, 200)
+        approved = before if single else before[0]
+        assert approved["status"] == "APPROVED" and approved["active_attempt_id"] is None
+        assert "START_SIGNING" in approved["available_actions"]
+
+        monkeypatch.setattr(applications, "view", paused_view)
+        with ThreadPoolExecutor() as pool:
+            reading = pool.submit(stand.request, "GET", read_path, 200)
+            try:
+                assert entered.wait(5)
+                attempt = stand.request("POST", path + "/signing-attempts", 201, key=uuid4())
+            finally:
+                proceed.set()
+            assert reading.result(5) == before
+
+        after = stand.request("GET", read_path, 200)
+        signing = after if single else after[0]
+        assert signing["status"] == "SIGNING_IN_PROGRESS"
+        assert signing["active_attempt_id"] == attempt["attempt_id"]
+        assert "START_SIGNING" not in signing["available_actions"]
 
 
 @pytest.mark.parametrize("offset", [0, 1])

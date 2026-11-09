@@ -25,12 +25,21 @@ def create_app(dsn=None, clock=store.now):
     def invoke(operation, request, method, path, args, key, identification, body, clock):
         handler = registry[operation["operationId"]]
         with store.connect(dsn) as db:
-            actor = one(db, "SELECT * FROM stand_session WHERE token_digest=%s FOR SHARE",
-                        (digest("bearer", bearer(request)),))
+            session_query = "SELECT * FROM stand_session WHERE token_digest=%s"
+            reading = method == "get"
+            if reading:
+                # Все запросы и расчёт доступных действий относятся к одному снимку чтения.
+                db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+            else:
+                session_query += " FOR SHARE"
+            actor = one(db, session_query, (digest("bearer", bearer(request)),))
             if not actor:
                 raise ApiError(401, "UNAUTHENTICATED")
             if not actor["enabled"] or actor["role"] not in operation["x-roles"]:
                 raise ApiError(403, "FORBIDDEN")
+            if reading:
+                read_at = clock()
+                clock = lambda: read_at
             ctx = Context(db, clock, actor, body, identification)
             if key is None:
                 return handler(ctx, **args)

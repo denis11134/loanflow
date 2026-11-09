@@ -1,12 +1,13 @@
+import logging
 from datetime import timedelta
 from decimal import Decimal, localcontext
-from io import BytesIO
 from functools import lru_cache
+from io import BytesIO
 from uuid import uuid4
 
 from psycopg.types.json import Jsonb
 from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase.ttfonts import TTFError, TTFont
 from reportlab.pdfgen import canvas
 
 from .calendar import holidays, offer_deadline, underwriting_deadline
@@ -14,6 +15,7 @@ from .store import enqueue, lock_application, one, reserve_transition
 
 STAGES = ("AML", "CREDIT_REPORT", "DE", "PUBLISH")
 SLA_TICK = timedelta(microseconds=1)
+log = logging.getLogger(__name__)
 
 
 def scenario_for(db, application_id):
@@ -77,7 +79,8 @@ def finish_decision(db, app, clock, parameters=None, reason=None, operator=None,
 @lru_cache(maxsize=1)
 def terms_font():
     name = "DejaVuSans"
-    pdfmetrics.registerFont(TTFont(name, "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"))
+    with open("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "rb") as font:
+        pdfmetrics.registerFont(TTFont(name, font))
     return name
 
 
@@ -153,7 +156,6 @@ def evaluate_de(db, app, scenario, clock):
 
 
 def run(db, job, clock, checkpoint):
-
     app_id = job["resource_id"]
     kind = job["kind"]
     needed = "APPROVED" if kind == "PUBLISH" else "SCORING"
@@ -164,7 +166,16 @@ def run(db, job, clock, checkpoint):
     failure = adapter_outcome(scenario, kind, job["failures"]) if scenario is not None else "PERMANENT"
     audit(db, kind, app_id, clock(), job["failures"] + 1)
     offer = one(db, "SELECT * FROM offer WHERE application_id=%s", (app_id,)) if kind == "PUBLISH" else None
-    pdf = render_terms(offer) if offer and failure == "OK" else None
+    pdf = None
+    if offer and failure == "OK":
+        try:
+            pdf = render_terms(offer)
+        except Exception as exc:
+            # Ошибки обязательного ресурса образа требуют исправления конфигурации.
+            permanent = isinstance(exc, (TTFError, FileNotFoundError, PermissionError,
+                                         IsADirectoryError, NotADirectoryError))
+            failure = "PERMANENT" if permanent else "TEMPORARY"
+            log.warning("terms_render_failed category=%s outcome=%s", type(exc).__name__, failure)
     checkpoint("after_" + kind.lower(), job)
     app = lock_application(db, app_id)
     if app["status"] != needed:

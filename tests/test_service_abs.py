@@ -6,6 +6,7 @@ import threading
 
 import pytest
 
+from services.loanflow import reconciliation
 from services.loanflow.abs import create_abs, post_pending
 from services.loanflow.store import connect
 from services.loanflow.worker import AbsClient
@@ -298,6 +299,51 @@ def test_old_terminal_read_after_new_conflict(setup_stand, monkeypatch):
         card = stand.request("GET", path, 200, "reconciliation")
         assert card["last_read"]["result"] == "CONFLICT" and card["final_result"] == "POSTED"
         assert_reserve(stand, "CONSUMED")
+
+
+@pytest.mark.parametrize("single", [True, False], ids=["card", "queue"])
+def test_reconciliation_read_during_terminal_transition(setup_stand, monkeypatch, single):
+    stand = setup_stand
+    entered, proceed = threading.Event(), threading.Event()
+    pause = pause_at("reconciliation_read", entered, proceed)
+    original = reconciliation.view
+
+    def paused_view(db, row):
+        if row["contract_status"] == "DISBURSEMENT_PROCESSING":
+            pause("reconciliation_read")
+        return original(db, row)
+
+    with stand.serve(), abs_server(stand, monkeypatch) as client:
+        signed_contract(stand, "49999.00")
+        instruction = instruction_id(stand)
+        queue = "/reconciliation/instructions"
+        path = f"{queue}/{instruction}"
+        process(stand, "SEND", abs_client=client)
+        register(stand, path)
+        process(stand, "ABS_READ", abs_client=client)
+        read_path = path if single else queue
+        before = stand.request("GET", read_path, 200, "reconciliation")
+        processing = before if single else before[0]
+        assert processing["last_read"]["result"] == "PENDING"
+        assert processing["can_close"]
+
+        monkeypatch.setattr(reconciliation, "view", paused_view)
+        with ThreadPoolExecutor() as pool:
+            reading = pool.submit(stand.request, "GET", read_path, 200, "reconciliation")
+            try:
+                assert entered.wait(5)
+                with connect(stand.dsn) as db:
+                    assert post_pending(db, instruction, stand.clock)["state"] == "POSTED"
+                register(stand, path)
+                process(stand, "ABS_READ", abs_client=client)
+            finally:
+                proceed.set()
+            assert reading.result(5) == before
+
+        after = stand.request("GET", path, 200, "reconciliation")
+        assert after["contract_status"] == "DISBURSED" and after["final_result"] == "POSTED"
+        assert after["last_read"]["result"] == "POSTED" and not after["can_close"]
+        assert stand.request("GET", queue, 200, "reconciliation") == []
 
 
 def test_close_job_recovers_before_first_call_and_read_times_out(setup_stand, monkeypatch):
