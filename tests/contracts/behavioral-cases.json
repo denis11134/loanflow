@@ -1,0 +1,18 @@
+[
+  {
+    "id": "report_empty_denominator",
+    "schema": "UnderwriterWeeklyMetrics",
+    "body": {"underwriter_id": "synthetic", "decision_count": 0, "median_time_to_decision_seconds": 60, "approval_rate": 0.5, "overdue_count": 1, "observed_loan_count": 0, "overdue_rate": 0.5},
+    "source": "FR-UC04-03; 2.3, недельный отчёт",
+    "expected": "При отсутствии решений медиана и доля одобрений null; без наблюдаемых кредитов overdue_count=0, overdue_rate=null.",
+    "classification": "Арифметику и выборку проверять на сервисе; схема сейчас пропускает пример."
+  },
+  {
+    "id": "read_wrong_instruction",
+    "schema": "ReconciliationView",
+    "body": {"instruction_id":"10000000-0000-0000-0000-000000000001", "contract_id":"10000000-0000-0000-0000-000000000001", "contract_status":"DISBURSEMENT_PROCESSING", "close_command_accepted":false, "can_close":true, "can_retry_close":false, "last_read":{"instruction_id":"20000000-0000-0000-0000-000000000002", "read_seq":2, "requested_at":"2026-11-09T10:00:00+04:00", "result":"PENDING"}},
+    "source": "2.1, Корреляция и восстановление сверки",
+    "expected": "Чужое чтение не разрешает закрытие. Сверить идентификаторы и максимальный зарегистрированный read_seq по данным сервиса.",
+    "classification": "Равенство идентификаторов и история чтений не проверяются OAS 3.0."
+  }
+]

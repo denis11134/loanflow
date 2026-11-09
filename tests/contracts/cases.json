@@ -1,0 +1,2795 @@
+[
+  {
+    "id": "attempt_OPEN",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "10000000-0000-0000-0000-000000000001",
+      "state": "OPEN",
+      "expires_at": "2026-11-09T10:05:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 2,
+      "can_resend": true,
+      "can_verify": true
+    },
+    "valid": true,
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "attempt_VERIFYING",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "10000000-0000-0000-0000-000000000001",
+      "state": "VERIFYING",
+      "expires_at": "2026-11-09T10:05:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 2,
+      "can_resend": false,
+      "can_verify": false
+    },
+    "valid": true,
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "attempt_VERIFYING_can_verify",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "10000000-0000-0000-0000-000000000001",
+      "state": "VERIFYING",
+      "expires_at": "2026-11-09T10:05:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 2,
+      "can_resend": false,
+      "can_verify": true
+    },
+    "valid": false,
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "attempt_VERIFYING_can_resend",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "10000000-0000-0000-0000-000000000001",
+      "state": "VERIFYING",
+      "expires_at": "2026-11-09T10:05:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 2,
+      "can_resend": true,
+      "can_verify": false
+    },
+    "valid": false,
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "attempt_SIGNED",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "10000000-0000-0000-0000-000000000001",
+      "state": "SIGNED",
+      "expires_at": "2026-11-09T10:05:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 2,
+      "can_resend": false,
+      "can_verify": false,
+      "contract_id": "10000000-0000-0000-0000-000000000001"
+    },
+    "valid": true,
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "attempt_SIGNED_can_verify",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "10000000-0000-0000-0000-000000000001",
+      "state": "SIGNED",
+      "expires_at": "2026-11-09T10:05:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 2,
+      "can_resend": false,
+      "can_verify": true,
+      "contract_id": "10000000-0000-0000-0000-000000000001"
+    },
+    "valid": false,
+    "issue": "API-01",
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "attempt_SIGNED_can_resend",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "10000000-0000-0000-0000-000000000001",
+      "state": "SIGNED",
+      "expires_at": "2026-11-09T10:05:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 2,
+      "can_resend": true,
+      "can_verify": false,
+      "contract_id": "10000000-0000-0000-0000-000000000001"
+    },
+    "valid": false,
+    "issue": "API-01",
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "signed_missing_contract",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "10000000-0000-0000-0000-000000000001",
+      "state": "SIGNED",
+      "expires_at": "2026-11-09T10:05:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 2,
+      "can_resend": false,
+      "can_verify": false
+    },
+    "valid": false,
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "attempt_CLOSED",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "10000000-0000-0000-0000-000000000001",
+      "state": "CLOSED",
+      "expires_at": "2026-11-09T10:05:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 2,
+      "can_resend": false,
+      "can_verify": false,
+      "close_reason": "INVALID_CODE"
+    },
+    "valid": true,
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "attempt_CLOSED_can_verify",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "10000000-0000-0000-0000-000000000001",
+      "state": "CLOSED",
+      "expires_at": "2026-11-09T10:05:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 2,
+      "can_resend": false,
+      "can_verify": true,
+      "close_reason": "INVALID_CODE"
+    },
+    "valid": false,
+    "issue": "API-01",
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "attempt_CLOSED_can_resend",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "10000000-0000-0000-0000-000000000001",
+      "state": "CLOSED",
+      "expires_at": "2026-11-09T10:05:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 2,
+      "can_resend": true,
+      "can_verify": false,
+      "close_reason": "INVALID_CODE"
+    },
+    "valid": false,
+    "issue": "API-01",
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "closed_missing_reason",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "10000000-0000-0000-0000-000000000001",
+      "state": "CLOSED",
+      "expires_at": "2026-11-09T10:05:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 2,
+      "can_resend": false,
+      "can_verify": false
+    },
+    "valid": false,
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "open_no_resends_left",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "10000000-0000-0000-0000-000000000001",
+      "state": "OPEN",
+      "expires_at": "2026-11-09T10:05:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 0,
+      "can_resend": true,
+      "can_verify": true
+    },
+    "valid": false,
+    "issue": "API-01",
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "terminal_both_actions_SIGNED",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "10000000-0000-0000-0000-000000000001",
+      "state": "SIGNED",
+      "expires_at": "2026-11-09T10:05:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 2,
+      "can_resend": true,
+      "can_verify": true,
+      "contract_id": "10000000-0000-0000-0000-000000000001"
+    },
+    "valid": false,
+    "issue": "API-01",
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "terminal_both_actions_CLOSED",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "10000000-0000-0000-0000-000000000001",
+      "state": "CLOSED",
+      "expires_at": "2026-11-09T10:05:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 2,
+      "can_resend": true,
+      "can_verify": true,
+      "close_reason": "ATTEMPT_EXPIRED"
+    },
+    "valid": false,
+    "issue": "API-01",
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "application_draft",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DRAFT",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": null,
+      "requested_amount_minor": null,
+      "requested_term_months": null,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT",
+        "CANCEL_APPLICATION"
+      ]
+    },
+    "valid": true,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_SCORING",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "SCORING",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": []
+    },
+    "valid": true,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_SCORING_edit",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "SCORING",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT"
+      ]
+    },
+    "valid": false,
+    "issue": "API-04",
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_UNDERWRITING",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "UNDERWRITING",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": []
+    },
+    "valid": true,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_UNDERWRITING_edit",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "UNDERWRITING",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT"
+      ]
+    },
+    "valid": false,
+    "issue": "API-04",
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_APPROVED",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "APPROVED",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "AVAILABLE",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": []
+    },
+    "valid": true,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_APPROVED_edit",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "APPROVED",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "AVAILABLE",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT"
+      ]
+    },
+    "valid": false,
+    "issue": "API-04",
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_SIGNING_IN_PROGRESS",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "SIGNING_IN_PROGRESS",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "AVAILABLE",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "active_attempt_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": []
+    },
+    "valid": true,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_SIGNING_IN_PROGRESS_edit",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "SIGNING_IN_PROGRESS",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "AVAILABLE",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "active_attempt_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT"
+      ]
+    },
+    "valid": false,
+    "issue": "API-04",
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_CONTRACT_SIGNED",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "CONTRACT_SIGNED",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "display_reason": null,
+      "available_actions": []
+    },
+    "valid": true,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_CONTRACT_SIGNED_edit",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "CONTRACT_SIGNED",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT"
+      ]
+    },
+    "valid": false,
+    "issue": "API-04",
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_BANK_REJECTED",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "BANK_REJECTED",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": "REFUSED",
+      "available_actions": []
+    },
+    "valid": true,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_BANK_REJECTED_edit",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "BANK_REJECTED",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": "REFUSED",
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT"
+      ]
+    },
+    "valid": false,
+    "issue": "API-04",
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_CLIENT_CANCELED",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "CLIENT_CANCELED",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": []
+    },
+    "valid": true,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_CLIENT_CANCELED_edit",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "CLIENT_CANCELED",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT"
+      ]
+    },
+    "valid": false,
+    "issue": "API-04",
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_OFFER_EXPIRED",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "OFFER_EXPIRED",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": []
+    },
+    "valid": true,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_OFFER_EXPIRED_edit",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "OFFER_EXPIRED",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT"
+      ]
+    },
+    "valid": false,
+    "issue": "API-04",
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_SYSTEM_ERROR",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "SYSTEM_ERROR",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": []
+    },
+    "valid": true,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "application_SYSTEM_ERROR_edit",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "SYSTEM_ERROR",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_amount_minor": "5000000",
+      "requested_term_months": 12,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT"
+      ]
+    },
+    "valid": false,
+    "issue": "API-04",
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "scoring_without_submission",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "SCORING",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": null,
+      "requested_amount_minor": null,
+      "requested_term_months": null,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": []
+    },
+    "valid": false,
+    "issue": "API-04",
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "signed_application_without_contract",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "CONTRACT_SIGNED",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": null,
+      "requested_amount_minor": null,
+      "requested_term_months": null,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": []
+    },
+    "valid": false,
+    "issue": "API-04",
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "ContractView_cooling",
+    "api": "loanflow",
+    "schema": "ContractView",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "COOLING_OFF",
+      "signed_at": "2026-11-09T10:00:00+04:00",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": null,
+      "can_withdraw": true
+    },
+    "valid": true,
+    "operation": "getOwnContract",
+    "status": 200
+  },
+  {
+    "id": "ContractView_DISBURSEMENT_PROCESSING",
+    "api": "loanflow",
+    "schema": "ContractView",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DISBURSEMENT_PROCESSING",
+      "signed_at": "2026-11-09T10:00:00+04:00",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": null,
+      "can_withdraw": false
+    },
+    "valid": true,
+    "operation": "getOwnContract",
+    "status": 200
+  },
+  {
+    "id": "ContractView_DISBURSEMENT_PROCESSING_withdraw",
+    "api": "loanflow",
+    "schema": "ContractView",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DISBURSEMENT_PROCESSING",
+      "signed_at": "2026-11-09T10:00:00+04:00",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": null,
+      "can_withdraw": true
+    },
+    "valid": false,
+    "issue": "API-05",
+    "operation": "getOwnContract",
+    "status": 200
+  },
+  {
+    "id": "ContractView_CANCELED_BY_CLIENT",
+    "api": "loanflow",
+    "schema": "ContractView",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "CANCELED_BY_CLIENT",
+      "signed_at": "2026-11-09T10:00:00+04:00",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": null,
+      "can_withdraw": false
+    },
+    "valid": true,
+    "operation": "getOwnContract",
+    "status": 200
+  },
+  {
+    "id": "ContractView_CANCELED_BY_CLIENT_withdraw",
+    "api": "loanflow",
+    "schema": "ContractView",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "CANCELED_BY_CLIENT",
+      "signed_at": "2026-11-09T10:00:00+04:00",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": null,
+      "can_withdraw": true
+    },
+    "valid": false,
+    "issue": "API-05",
+    "operation": "getOwnContract",
+    "status": 200
+  },
+  {
+    "id": "ContractView_DISBURSED",
+    "api": "loanflow",
+    "schema": "ContractView",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DISBURSED",
+      "signed_at": "2026-11-09T10:00:00+04:00",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": "2026-11-09T10:00:00+04:00",
+      "can_withdraw": false
+    },
+    "valid": true,
+    "operation": "getOwnContract",
+    "status": 200
+  },
+  {
+    "id": "ContractView_DISBURSED_withdraw",
+    "api": "loanflow",
+    "schema": "ContractView",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DISBURSED",
+      "signed_at": "2026-11-09T10:00:00+04:00",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": "2026-11-09T10:00:00+04:00",
+      "can_withdraw": true
+    },
+    "valid": false,
+    "issue": "API-05",
+    "operation": "getOwnContract",
+    "status": 200
+  },
+  {
+    "id": "ContractView_DISBURSEMENT_FAILED",
+    "api": "loanflow",
+    "schema": "ContractView",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DISBURSEMENT_FAILED",
+      "signed_at": "2026-11-09T10:00:00+04:00",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": null,
+      "can_withdraw": false
+    },
+    "valid": true,
+    "operation": "getOwnContract",
+    "status": 200
+  },
+  {
+    "id": "ContractView_DISBURSEMENT_FAILED_withdraw",
+    "api": "loanflow",
+    "schema": "ContractView",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DISBURSEMENT_FAILED",
+      "signed_at": "2026-11-09T10:00:00+04:00",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": null,
+      "can_withdraw": true
+    },
+    "valid": false,
+    "issue": "API-05",
+    "operation": "getOwnContract",
+    "status": 200
+  },
+  {
+    "id": "ContractView_cooling_without_end",
+    "api": "loanflow",
+    "schema": "ContractView",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "COOLING_OFF",
+      "signed_at": "2026-11-09T10:00:00+04:00",
+      "cooling_ends_at": null,
+      "posted_at": null,
+      "can_withdraw": true
+    },
+    "valid": false,
+    "issue": "API-05",
+    "operation": "getOwnContract",
+    "status": 200
+  },
+  {
+    "id": "ContractView_disbursed_without_posting",
+    "api": "loanflow",
+    "schema": "ContractView",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DISBURSED",
+      "signed_at": "2026-11-09T10:00:00+04:00",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": null,
+      "can_withdraw": false
+    },
+    "valid": false,
+    "issue": "API-05",
+    "operation": "getOwnContract",
+    "status": 200
+  },
+  {
+    "id": "ContractView_premature_posting",
+    "api": "loanflow",
+    "schema": "ContractView",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "COOLING_OFF",
+      "signed_at": "2026-11-09T10:00:00+04:00",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": "2026-11-09T10:00:00+04:00",
+      "can_withdraw": true
+    },
+    "valid": false,
+    "issue": "API-05",
+    "operation": "getOwnContract",
+    "status": 200
+  },
+  {
+    "id": "ContactContract_cooling",
+    "api": "loanflow",
+    "schema": "ContactContract",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "status": "COOLING_OFF",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": null,
+      "withdrawal_available_after_identification": true
+    },
+    "valid": true
+  },
+  {
+    "id": "ContactContract_DISBURSEMENT_PROCESSING",
+    "api": "loanflow",
+    "schema": "ContactContract",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DISBURSEMENT_PROCESSING",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": null,
+      "withdrawal_available_after_identification": false
+    },
+    "valid": true
+  },
+  {
+    "id": "ContactContract_DISBURSEMENT_PROCESSING_withdraw",
+    "api": "loanflow",
+    "schema": "ContactContract",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DISBURSEMENT_PROCESSING",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": null,
+      "withdrawal_available_after_identification": true
+    },
+    "valid": false,
+    "issue": "API-05"
+  },
+  {
+    "id": "ContactContract_CANCELED_BY_CLIENT",
+    "api": "loanflow",
+    "schema": "ContactContract",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "status": "CANCELED_BY_CLIENT",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": null,
+      "withdrawal_available_after_identification": false
+    },
+    "valid": true
+  },
+  {
+    "id": "ContactContract_CANCELED_BY_CLIENT_withdraw",
+    "api": "loanflow",
+    "schema": "ContactContract",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "status": "CANCELED_BY_CLIENT",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": null,
+      "withdrawal_available_after_identification": true
+    },
+    "valid": false,
+    "issue": "API-05"
+  },
+  {
+    "id": "ContactContract_DISBURSED",
+    "api": "loanflow",
+    "schema": "ContactContract",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DISBURSED",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": "2026-11-09T10:00:00+04:00",
+      "withdrawal_available_after_identification": false
+    },
+    "valid": true
+  },
+  {
+    "id": "ContactContract_DISBURSED_withdraw",
+    "api": "loanflow",
+    "schema": "ContactContract",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DISBURSED",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": "2026-11-09T10:00:00+04:00",
+      "withdrawal_available_after_identification": true
+    },
+    "valid": false,
+    "issue": "API-05"
+  },
+  {
+    "id": "ContactContract_DISBURSEMENT_FAILED",
+    "api": "loanflow",
+    "schema": "ContactContract",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DISBURSEMENT_FAILED",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": null,
+      "withdrawal_available_after_identification": false
+    },
+    "valid": true
+  },
+  {
+    "id": "ContactContract_DISBURSEMENT_FAILED_withdraw",
+    "api": "loanflow",
+    "schema": "ContactContract",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DISBURSEMENT_FAILED",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": null,
+      "withdrawal_available_after_identification": true
+    },
+    "valid": false,
+    "issue": "API-05"
+  },
+  {
+    "id": "ContactContract_cooling_without_end",
+    "api": "loanflow",
+    "schema": "ContactContract",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "status": "COOLING_OFF",
+      "cooling_ends_at": null,
+      "posted_at": null,
+      "withdrawal_available_after_identification": true
+    },
+    "valid": false,
+    "issue": "API-05"
+  },
+  {
+    "id": "ContactContract_disbursed_without_posting",
+    "api": "loanflow",
+    "schema": "ContactContract",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DISBURSED",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": null,
+      "withdrawal_available_after_identification": false
+    },
+    "valid": false,
+    "issue": "API-05"
+  },
+  {
+    "id": "ContactContract_premature_posting",
+    "api": "loanflow",
+    "schema": "ContactContract",
+    "body": {
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "status": "COOLING_OFF",
+      "cooling_ends_at": "2026-11-09T14:00:00+04:00",
+      "posted_at": "2026-11-09T10:00:00+04:00",
+      "withdrawal_available_after_identification": true
+    },
+    "valid": false,
+    "issue": "API-05"
+  },
+  {
+    "id": "reconciliation_initial",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_PROCESSING",
+      "close_command_accepted": false,
+      "can_close": false,
+      "can_retry_close": false
+    },
+    "valid": true,
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "retry_without_command",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_PROCESSING",
+      "close_command_accepted": false,
+      "can_close": false,
+      "can_retry_close": true
+    },
+    "valid": false,
+    "issue": "API-02",
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "close_without_read",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_PROCESSING",
+      "close_command_accepted": false,
+      "can_close": true,
+      "can_retry_close": false
+    },
+    "valid": false,
+    "issue": "API-02",
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "reconciliation_WAITING",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_PROCESSING",
+      "close_command_accepted": false,
+      "can_close": false,
+      "can_retry_close": false,
+      "last_read": {
+        "instruction_id": "10000000-0000-0000-0000-000000000001",
+        "read_seq": 2,
+        "requested_at": "2026-11-09T10:00:00+04:00",
+        "result": "WAITING"
+      }
+    },
+    "valid": true,
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "close_after_WAITING",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_PROCESSING",
+      "close_command_accepted": false,
+      "can_close": true,
+      "can_retry_close": false,
+      "last_read": {
+        "instruction_id": "10000000-0000-0000-0000-000000000001",
+        "read_seq": 2,
+        "requested_at": "2026-11-09T10:00:00+04:00",
+        "result": "WAITING"
+      }
+    },
+    "valid": false,
+    "issue": "API-02",
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "reconciliation_TIMEOUT",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_PROCESSING",
+      "close_command_accepted": false,
+      "can_close": false,
+      "can_retry_close": false,
+      "last_read": {
+        "instruction_id": "10000000-0000-0000-0000-000000000001",
+        "read_seq": 2,
+        "requested_at": "2026-11-09T10:00:00+04:00",
+        "result": "TIMEOUT"
+      }
+    },
+    "valid": true,
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "close_after_TIMEOUT",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_PROCESSING",
+      "close_command_accepted": false,
+      "can_close": true,
+      "can_retry_close": false,
+      "last_read": {
+        "instruction_id": "10000000-0000-0000-0000-000000000001",
+        "read_seq": 2,
+        "requested_at": "2026-11-09T10:00:00+04:00",
+        "result": "TIMEOUT"
+      }
+    },
+    "valid": false,
+    "issue": "API-02",
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "reconciliation_CONFLICT",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_PROCESSING",
+      "close_command_accepted": false,
+      "can_close": false,
+      "can_retry_close": false,
+      "last_read": {
+        "instruction_id": "10000000-0000-0000-0000-000000000001",
+        "read_seq": 2,
+        "requested_at": "2026-11-09T10:00:00+04:00",
+        "result": "CONFLICT"
+      }
+    },
+    "valid": true,
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "close_after_CONFLICT",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_PROCESSING",
+      "close_command_accepted": false,
+      "can_close": true,
+      "can_retry_close": false,
+      "last_read": {
+        "instruction_id": "10000000-0000-0000-0000-000000000001",
+        "read_seq": 2,
+        "requested_at": "2026-11-09T10:00:00+04:00",
+        "result": "CONFLICT"
+      }
+    },
+    "valid": false,
+    "issue": "API-02",
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "reconciliation_CORRELATION_ERROR",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_PROCESSING",
+      "close_command_accepted": false,
+      "can_close": false,
+      "can_retry_close": false,
+      "last_read": {
+        "instruction_id": "10000000-0000-0000-0000-000000000001",
+        "read_seq": 2,
+        "requested_at": "2026-11-09T10:00:00+04:00",
+        "result": "CORRELATION_ERROR"
+      }
+    },
+    "valid": true,
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "close_after_CORRELATION_ERROR",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_PROCESSING",
+      "close_command_accepted": false,
+      "can_close": true,
+      "can_retry_close": false,
+      "last_read": {
+        "instruction_id": "10000000-0000-0000-0000-000000000001",
+        "read_seq": 2,
+        "requested_at": "2026-11-09T10:00:00+04:00",
+        "result": "CORRELATION_ERROR"
+      }
+    },
+    "valid": false,
+    "issue": "API-02",
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "reconciliation_NOT_FOUND",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_PROCESSING",
+      "close_command_accepted": false,
+      "can_close": true,
+      "can_retry_close": false,
+      "last_read": {
+        "instruction_id": "10000000-0000-0000-0000-000000000001",
+        "read_seq": 2,
+        "requested_at": "2026-11-09T10:00:00+04:00",
+        "result": "NOT_FOUND"
+      }
+    },
+    "valid": true,
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "reconciliation_PENDING",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_PROCESSING",
+      "close_command_accepted": false,
+      "can_close": true,
+      "can_retry_close": false,
+      "last_read": {
+        "instruction_id": "10000000-0000-0000-0000-000000000001",
+        "read_seq": 2,
+        "requested_at": "2026-11-09T10:00:00+04:00",
+        "result": "PENDING"
+      }
+    },
+    "valid": true,
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "retry_after_waiting",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_PROCESSING",
+      "close_command_accepted": true,
+      "can_close": false,
+      "can_retry_close": true,
+      "last_read": {
+        "instruction_id": "10000000-0000-0000-0000-000000000001",
+        "read_seq": 3,
+        "requested_at": "2026-11-09T10:00:00+04:00",
+        "result": "WAITING"
+      }
+    },
+    "valid": true,
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "reconciliation_POSTED",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSED",
+      "close_command_accepted": false,
+      "can_close": false,
+      "can_retry_close": false,
+      "final_result": "POSTED"
+    },
+    "valid": true,
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "final_reconciliation_actions_POSTED",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSED",
+      "close_command_accepted": false,
+      "can_close": true,
+      "can_retry_close": false,
+      "final_result": "POSTED"
+    },
+    "valid": false,
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "reconciliation_CLOSED",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_FAILED",
+      "close_command_accepted": false,
+      "can_close": false,
+      "can_retry_close": false,
+      "final_result": "CLOSED"
+    },
+    "valid": true,
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "final_reconciliation_actions_CLOSED",
+    "api": "loanflow",
+    "schema": "ReconciliationView",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "contract_id": "10000000-0000-0000-0000-000000000001",
+      "contract_status": "DISBURSEMENT_FAILED",
+      "close_command_accepted": false,
+      "can_close": true,
+      "can_retry_close": false,
+      "final_result": "CLOSED"
+    },
+    "valid": false,
+    "operation": "getReconciliation",
+    "status": 200
+  },
+  {
+    "id": "terms_without_notice",
+    "api": "loanflow",
+    "schema": "TermsAvailable",
+    "body": {
+      "state": "AVAILABLE",
+      "offer_id": "10000000-0000-0000-0000-000000000001",
+      "terms_id": "10000000-0000-0000-0000-000000000001",
+      "amount_minor": "5000000",
+      "term_months": 12,
+      "annual_rate_percent": "20",
+      "monthly_payment_minor": "460000",
+      "psk_annual_percent": "20",
+      "psk_rub": "5200.00",
+      "first_provided_at": "2026-11-09T10:00:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "cooling_hours": 4,
+      "withdrawal_available_during_cooling": true,
+      "pdn_notice_required": false
+    },
+    "valid": true,
+    "operation": "getOffer",
+    "status": 200
+  },
+  {
+    "id": "terms_with_notice",
+    "api": "loanflow",
+    "schema": "TermsAvailable",
+    "body": {
+      "state": "AVAILABLE",
+      "offer_id": "10000000-0000-0000-0000-000000000001",
+      "terms_id": "10000000-0000-0000-0000-000000000001",
+      "amount_minor": "5000000",
+      "term_months": 12,
+      "annual_rate_percent": "20",
+      "monthly_payment_minor": "460000",
+      "psk_annual_percent": "20",
+      "psk_rub": "5200.00",
+      "first_provided_at": "2026-11-09T10:00:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "cooling_hours": 4,
+      "withdrawal_available_during_cooling": true,
+      "pdn_notice_required": true,
+      "pdn_notice": {
+        "version": "test-1",
+        "text": "Синтетическое предупреждение",
+        "shown_at": null
+      }
+    },
+    "valid": true,
+    "operation": "getOffer",
+    "status": 200
+  },
+  {
+    "id": "required_notice_missing",
+    "api": "loanflow",
+    "schema": "TermsAvailable",
+    "body": {
+      "state": "AVAILABLE",
+      "offer_id": "10000000-0000-0000-0000-000000000001",
+      "terms_id": "10000000-0000-0000-0000-000000000001",
+      "amount_minor": "5000000",
+      "term_months": 12,
+      "annual_rate_percent": "20",
+      "monthly_payment_minor": "460000",
+      "psk_annual_percent": "20",
+      "psk_rub": "5200.00",
+      "first_provided_at": "2026-11-09T10:00:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "cooling_hours": 4,
+      "withdrawal_available_during_cooling": true,
+      "pdn_notice_required": true
+    },
+    "valid": false,
+    "operation": "getOffer",
+    "status": 200
+  },
+  {
+    "id": "unexpected_notice",
+    "api": "loanflow",
+    "schema": "TermsAvailable",
+    "body": {
+      "state": "AVAILABLE",
+      "offer_id": "10000000-0000-0000-0000-000000000001",
+      "terms_id": "10000000-0000-0000-0000-000000000001",
+      "amount_minor": "5000000",
+      "term_months": 12,
+      "annual_rate_percent": "20",
+      "monthly_payment_minor": "460000",
+      "psk_annual_percent": "20",
+      "psk_rub": "5200.00",
+      "first_provided_at": "2026-11-09T10:00:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "cooling_hours": 4,
+      "withdrawal_available_during_cooling": true,
+      "pdn_notice_required": false,
+      "pdn_notice": {
+        "version": "test-1",
+        "text": "Синтетическое предупреждение",
+        "shown_at": null
+      }
+    },
+    "valid": false,
+    "operation": "getOffer",
+    "status": 200
+  },
+  {
+    "id": "DraftInput_amount_1",
+    "api": "loanflow",
+    "schema": "DraftInput",
+    "body": {
+      "requested_amount_minor": "1"
+    },
+    "valid": true
+  },
+  {
+    "id": "DraftInput_amount_9223372036854775807",
+    "api": "loanflow",
+    "schema": "DraftInput",
+    "body": {
+      "requested_amount_minor": "9223372036854775807"
+    },
+    "valid": true
+  },
+  {
+    "id": "DraftInput_bad_amount_0",
+    "api": "loanflow",
+    "schema": "DraftInput",
+    "body": {
+      "requested_amount_minor": "0"
+    },
+    "valid": false
+  },
+  {
+    "id": "DraftInput_bad_amount_-1",
+    "api": "loanflow",
+    "schema": "DraftInput",
+    "body": {
+      "requested_amount_minor": "-1"
+    },
+    "valid": false
+  },
+  {
+    "id": "DraftInput_bad_amount_1.5",
+    "api": "loanflow",
+    "schema": "DraftInput",
+    "body": {
+      "requested_amount_minor": "1.5"
+    },
+    "valid": false
+  },
+  {
+    "id": "DraftInput_bad_amount_01",
+    "api": "loanflow",
+    "schema": "DraftInput",
+    "body": {
+      "requested_amount_minor": "01"
+    },
+    "valid": false
+  },
+  {
+    "id": "DraftInput_bad_amount_10000000000000000000",
+    "api": "loanflow",
+    "schema": "DraftInput",
+    "body": {
+      "requested_amount_minor": "10000000000000000000"
+    },
+    "valid": false
+  },
+  {
+    "id": "DraftInput_overflow_9223372036854775808",
+    "api": "loanflow",
+    "schema": "DraftInput",
+    "body": {
+      "requested_amount_minor": "9223372036854775808"
+    },
+    "valid": false,
+    "issue": "API-03"
+  },
+  {
+    "id": "DraftInput_overflow_9999999999999999999",
+    "api": "loanflow",
+    "schema": "DraftInput",
+    "body": {
+      "requested_amount_minor": "9999999999999999999"
+    },
+    "valid": false,
+    "issue": "API-03"
+  },
+  {
+    "id": "DraftPatch_amount_1",
+    "api": "loanflow",
+    "schema": "DraftPatch",
+    "body": {
+      "requested_amount_minor": "1"
+    },
+    "valid": true
+  },
+  {
+    "id": "DraftPatch_amount_9223372036854775807",
+    "api": "loanflow",
+    "schema": "DraftPatch",
+    "body": {
+      "requested_amount_minor": "9223372036854775807"
+    },
+    "valid": true
+  },
+  {
+    "id": "DraftPatch_bad_amount_0",
+    "api": "loanflow",
+    "schema": "DraftPatch",
+    "body": {
+      "requested_amount_minor": "0"
+    },
+    "valid": false
+  },
+  {
+    "id": "DraftPatch_bad_amount_-1",
+    "api": "loanflow",
+    "schema": "DraftPatch",
+    "body": {
+      "requested_amount_minor": "-1"
+    },
+    "valid": false
+  },
+  {
+    "id": "DraftPatch_bad_amount_1.5",
+    "api": "loanflow",
+    "schema": "DraftPatch",
+    "body": {
+      "requested_amount_minor": "1.5"
+    },
+    "valid": false
+  },
+  {
+    "id": "DraftPatch_bad_amount_01",
+    "api": "loanflow",
+    "schema": "DraftPatch",
+    "body": {
+      "requested_amount_minor": "01"
+    },
+    "valid": false
+  },
+  {
+    "id": "DraftPatch_bad_amount_10000000000000000000",
+    "api": "loanflow",
+    "schema": "DraftPatch",
+    "body": {
+      "requested_amount_minor": "10000000000000000000"
+    },
+    "valid": false
+  },
+  {
+    "id": "DraftPatch_overflow_9223372036854775808",
+    "api": "loanflow",
+    "schema": "DraftPatch",
+    "body": {
+      "requested_amount_minor": "9223372036854775808"
+    },
+    "valid": false,
+    "issue": "API-03"
+  },
+  {
+    "id": "DraftPatch_overflow_9999999999999999999",
+    "api": "loanflow",
+    "schema": "DraftPatch",
+    "body": {
+      "requested_amount_minor": "9999999999999999999"
+    },
+    "valid": false,
+    "issue": "API-03"
+  },
+  {
+    "id": "ApplicationView_amount_1",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DRAFT",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": null,
+      "requested_amount_minor": "1",
+      "requested_term_months": null,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT",
+        "CANCEL_APPLICATION"
+      ]
+    },
+    "valid": true,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "ApplicationView_amount_9223372036854775807",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DRAFT",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": null,
+      "requested_amount_minor": "9223372036854775807",
+      "requested_term_months": null,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT",
+        "CANCEL_APPLICATION"
+      ]
+    },
+    "valid": true,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "ApplicationView_bad_amount_0",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DRAFT",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": null,
+      "requested_amount_minor": "0",
+      "requested_term_months": null,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT",
+        "CANCEL_APPLICATION"
+      ]
+    },
+    "valid": false,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "ApplicationView_bad_amount_-1",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DRAFT",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": null,
+      "requested_amount_minor": "-1",
+      "requested_term_months": null,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT",
+        "CANCEL_APPLICATION"
+      ]
+    },
+    "valid": false,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "ApplicationView_bad_amount_1.5",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DRAFT",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": null,
+      "requested_amount_minor": "1.5",
+      "requested_term_months": null,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT",
+        "CANCEL_APPLICATION"
+      ]
+    },
+    "valid": false,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "ApplicationView_bad_amount_01",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DRAFT",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": null,
+      "requested_amount_minor": "01",
+      "requested_term_months": null,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT",
+        "CANCEL_APPLICATION"
+      ]
+    },
+    "valid": false,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "ApplicationView_bad_amount_10000000000000000000",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DRAFT",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": null,
+      "requested_amount_minor": "10000000000000000000",
+      "requested_term_months": null,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT",
+        "CANCEL_APPLICATION"
+      ]
+    },
+    "valid": false,
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "ApplicationView_overflow_9223372036854775808",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DRAFT",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": null,
+      "requested_amount_minor": "9223372036854775808",
+      "requested_term_months": null,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT",
+        "CANCEL_APPLICATION"
+      ]
+    },
+    "valid": false,
+    "issue": "API-03",
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "ApplicationView_overflow_9999999999999999999",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DRAFT",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": null,
+      "requested_amount_minor": "9999999999999999999",
+      "requested_term_months": null,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT",
+        "CANCEL_APPLICATION"
+      ]
+    },
+    "valid": false,
+    "issue": "API-03",
+    "operation": "getOwnApplication",
+    "status": 200
+  },
+  {
+    "id": "TermsAvailable_amount_1",
+    "api": "loanflow",
+    "schema": "TermsAvailable",
+    "body": {
+      "state": "AVAILABLE",
+      "offer_id": "10000000-0000-0000-0000-000000000001",
+      "terms_id": "10000000-0000-0000-0000-000000000001",
+      "amount_minor": "1",
+      "term_months": 12,
+      "annual_rate_percent": "20",
+      "monthly_payment_minor": "460000",
+      "psk_annual_percent": "20",
+      "psk_rub": "5200.00",
+      "first_provided_at": "2026-11-09T10:00:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "cooling_hours": 4,
+      "withdrawal_available_during_cooling": true,
+      "pdn_notice_required": false
+    },
+    "valid": true,
+    "operation": "getOffer",
+    "status": 200
+  },
+  {
+    "id": "TermsAvailable_amount_9223372036854775807",
+    "api": "loanflow",
+    "schema": "TermsAvailable",
+    "body": {
+      "state": "AVAILABLE",
+      "offer_id": "10000000-0000-0000-0000-000000000001",
+      "terms_id": "10000000-0000-0000-0000-000000000001",
+      "amount_minor": "9223372036854775807",
+      "term_months": 12,
+      "annual_rate_percent": "20",
+      "monthly_payment_minor": "460000",
+      "psk_annual_percent": "20",
+      "psk_rub": "5200.00",
+      "first_provided_at": "2026-11-09T10:00:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "cooling_hours": 4,
+      "withdrawal_available_during_cooling": true,
+      "pdn_notice_required": false
+    },
+    "valid": true,
+    "operation": "getOffer",
+    "status": 200
+  },
+  {
+    "id": "TermsAvailable_bad_amount_0",
+    "api": "loanflow",
+    "schema": "TermsAvailable",
+    "body": {
+      "state": "AVAILABLE",
+      "offer_id": "10000000-0000-0000-0000-000000000001",
+      "terms_id": "10000000-0000-0000-0000-000000000001",
+      "amount_minor": "0",
+      "term_months": 12,
+      "annual_rate_percent": "20",
+      "monthly_payment_minor": "460000",
+      "psk_annual_percent": "20",
+      "psk_rub": "5200.00",
+      "first_provided_at": "2026-11-09T10:00:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "cooling_hours": 4,
+      "withdrawal_available_during_cooling": true,
+      "pdn_notice_required": false
+    },
+    "valid": false,
+    "operation": "getOffer",
+    "status": 200
+  },
+  {
+    "id": "TermsAvailable_bad_amount_-1",
+    "api": "loanflow",
+    "schema": "TermsAvailable",
+    "body": {
+      "state": "AVAILABLE",
+      "offer_id": "10000000-0000-0000-0000-000000000001",
+      "terms_id": "10000000-0000-0000-0000-000000000001",
+      "amount_minor": "-1",
+      "term_months": 12,
+      "annual_rate_percent": "20",
+      "monthly_payment_minor": "460000",
+      "psk_annual_percent": "20",
+      "psk_rub": "5200.00",
+      "first_provided_at": "2026-11-09T10:00:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "cooling_hours": 4,
+      "withdrawal_available_during_cooling": true,
+      "pdn_notice_required": false
+    },
+    "valid": false,
+    "operation": "getOffer",
+    "status": 200
+  },
+  {
+    "id": "TermsAvailable_bad_amount_1.5",
+    "api": "loanflow",
+    "schema": "TermsAvailable",
+    "body": {
+      "state": "AVAILABLE",
+      "offer_id": "10000000-0000-0000-0000-000000000001",
+      "terms_id": "10000000-0000-0000-0000-000000000001",
+      "amount_minor": "1.5",
+      "term_months": 12,
+      "annual_rate_percent": "20",
+      "monthly_payment_minor": "460000",
+      "psk_annual_percent": "20",
+      "psk_rub": "5200.00",
+      "first_provided_at": "2026-11-09T10:00:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "cooling_hours": 4,
+      "withdrawal_available_during_cooling": true,
+      "pdn_notice_required": false
+    },
+    "valid": false,
+    "operation": "getOffer",
+    "status": 200
+  },
+  {
+    "id": "TermsAvailable_bad_amount_01",
+    "api": "loanflow",
+    "schema": "TermsAvailable",
+    "body": {
+      "state": "AVAILABLE",
+      "offer_id": "10000000-0000-0000-0000-000000000001",
+      "terms_id": "10000000-0000-0000-0000-000000000001",
+      "amount_minor": "01",
+      "term_months": 12,
+      "annual_rate_percent": "20",
+      "monthly_payment_minor": "460000",
+      "psk_annual_percent": "20",
+      "psk_rub": "5200.00",
+      "first_provided_at": "2026-11-09T10:00:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "cooling_hours": 4,
+      "withdrawal_available_during_cooling": true,
+      "pdn_notice_required": false
+    },
+    "valid": false,
+    "operation": "getOffer",
+    "status": 200
+  },
+  {
+    "id": "TermsAvailable_bad_amount_10000000000000000000",
+    "api": "loanflow",
+    "schema": "TermsAvailable",
+    "body": {
+      "state": "AVAILABLE",
+      "offer_id": "10000000-0000-0000-0000-000000000001",
+      "terms_id": "10000000-0000-0000-0000-000000000001",
+      "amount_minor": "10000000000000000000",
+      "term_months": 12,
+      "annual_rate_percent": "20",
+      "monthly_payment_minor": "460000",
+      "psk_annual_percent": "20",
+      "psk_rub": "5200.00",
+      "first_provided_at": "2026-11-09T10:00:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "cooling_hours": 4,
+      "withdrawal_available_during_cooling": true,
+      "pdn_notice_required": false
+    },
+    "valid": false,
+    "operation": "getOffer",
+    "status": 200
+  },
+  {
+    "id": "TermsAvailable_overflow_9223372036854775808",
+    "api": "loanflow",
+    "schema": "TermsAvailable",
+    "body": {
+      "state": "AVAILABLE",
+      "offer_id": "10000000-0000-0000-0000-000000000001",
+      "terms_id": "10000000-0000-0000-0000-000000000001",
+      "amount_minor": "9223372036854775808",
+      "term_months": 12,
+      "annual_rate_percent": "20",
+      "monthly_payment_minor": "460000",
+      "psk_annual_percent": "20",
+      "psk_rub": "5200.00",
+      "first_provided_at": "2026-11-09T10:00:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "cooling_hours": 4,
+      "withdrawal_available_during_cooling": true,
+      "pdn_notice_required": false
+    },
+    "valid": false,
+    "issue": "API-03",
+    "operation": "getOffer",
+    "status": 200
+  },
+  {
+    "id": "TermsAvailable_overflow_9999999999999999999",
+    "api": "loanflow",
+    "schema": "TermsAvailable",
+    "body": {
+      "state": "AVAILABLE",
+      "offer_id": "10000000-0000-0000-0000-000000000001",
+      "terms_id": "10000000-0000-0000-0000-000000000001",
+      "amount_minor": "9999999999999999999",
+      "term_months": 12,
+      "annual_rate_percent": "20",
+      "monthly_payment_minor": "460000",
+      "psk_annual_percent": "20",
+      "psk_rub": "5200.00",
+      "first_provided_at": "2026-11-09T10:00:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "cooling_hours": 4,
+      "withdrawal_available_during_cooling": true,
+      "pdn_notice_required": false
+    },
+    "valid": false,
+    "issue": "API-03",
+    "operation": "getOffer",
+    "status": 200
+  },
+  {
+    "id": "UnderwritingView_amount_1",
+    "api": "loanflow",
+    "schema": "UnderwritingView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "UNDERWRITING",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_term_months": 12,
+      "sla_deadline_at": "2026-11-16T10:00:00+04:00",
+      "escalated_at": null,
+      "requested_amount_minor": "1"
+    },
+    "valid": true,
+    "operation": "getUnderwritingApplication",
+    "status": 200
+  },
+  {
+    "id": "UnderwritingView_amount_9223372036854775807",
+    "api": "loanflow",
+    "schema": "UnderwritingView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "UNDERWRITING",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_term_months": 12,
+      "sla_deadline_at": "2026-11-16T10:00:00+04:00",
+      "escalated_at": null,
+      "requested_amount_minor": "9223372036854775807"
+    },
+    "valid": true,
+    "operation": "getUnderwritingApplication",
+    "status": 200
+  },
+  {
+    "id": "UnderwritingView_bad_amount_0",
+    "api": "loanflow",
+    "schema": "UnderwritingView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "UNDERWRITING",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_term_months": 12,
+      "sla_deadline_at": "2026-11-16T10:00:00+04:00",
+      "escalated_at": null,
+      "requested_amount_minor": "0"
+    },
+    "valid": false,
+    "operation": "getUnderwritingApplication",
+    "status": 200
+  },
+  {
+    "id": "UnderwritingView_bad_amount_-1",
+    "api": "loanflow",
+    "schema": "UnderwritingView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "UNDERWRITING",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_term_months": 12,
+      "sla_deadline_at": "2026-11-16T10:00:00+04:00",
+      "escalated_at": null,
+      "requested_amount_minor": "-1"
+    },
+    "valid": false,
+    "operation": "getUnderwritingApplication",
+    "status": 200
+  },
+  {
+    "id": "UnderwritingView_bad_amount_1.5",
+    "api": "loanflow",
+    "schema": "UnderwritingView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "UNDERWRITING",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_term_months": 12,
+      "sla_deadline_at": "2026-11-16T10:00:00+04:00",
+      "escalated_at": null,
+      "requested_amount_minor": "1.5"
+    },
+    "valid": false,
+    "operation": "getUnderwritingApplication",
+    "status": 200
+  },
+  {
+    "id": "UnderwritingView_bad_amount_01",
+    "api": "loanflow",
+    "schema": "UnderwritingView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "UNDERWRITING",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_term_months": 12,
+      "sla_deadline_at": "2026-11-16T10:00:00+04:00",
+      "escalated_at": null,
+      "requested_amount_minor": "01"
+    },
+    "valid": false,
+    "operation": "getUnderwritingApplication",
+    "status": 200
+  },
+  {
+    "id": "UnderwritingView_bad_amount_10000000000000000000",
+    "api": "loanflow",
+    "schema": "UnderwritingView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "UNDERWRITING",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_term_months": 12,
+      "sla_deadline_at": "2026-11-16T10:00:00+04:00",
+      "escalated_at": null,
+      "requested_amount_minor": "10000000000000000000"
+    },
+    "valid": false,
+    "operation": "getUnderwritingApplication",
+    "status": 200
+  },
+  {
+    "id": "UnderwritingView_overflow_9223372036854775808",
+    "api": "loanflow",
+    "schema": "UnderwritingView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "UNDERWRITING",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_term_months": 12,
+      "sla_deadline_at": "2026-11-16T10:00:00+04:00",
+      "escalated_at": null,
+      "requested_amount_minor": "9223372036854775808"
+    },
+    "valid": false,
+    "issue": "API-03",
+    "operation": "getUnderwritingApplication",
+    "status": 200
+  },
+  {
+    "id": "UnderwritingView_overflow_9999999999999999999",
+    "api": "loanflow",
+    "schema": "UnderwritingView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "UNDERWRITING",
+      "submitted_at": "2026-11-09T10:00:00+04:00",
+      "requested_term_months": 12,
+      "sla_deadline_at": "2026-11-16T10:00:00+04:00",
+      "escalated_at": null,
+      "requested_amount_minor": "9999999999999999999"
+    },
+    "valid": false,
+    "issue": "API-03",
+    "operation": "getUnderwritingApplication",
+    "status": 200
+  },
+  {
+    "id": "manual_approved",
+    "api": "loanflow",
+    "schema": "ManualDecisionReceipt",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "command": "APPROVE",
+      "decision": "APPROVED",
+      "application_status": "APPROVED",
+      "decided_at": "2026-11-09T10:00:00+04:00"
+    },
+    "valid": true,
+    "operation": "recordManualDecision",
+    "status": 200
+  },
+  {
+    "id": "manual_explicit_reject",
+    "api": "loanflow",
+    "schema": "ManualDecisionReceipt",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "command": "REJECT",
+      "decision": "REJECTED",
+      "application_status": "BANK_REJECTED",
+      "decided_at": "2026-11-09T10:00:00+04:00"
+    },
+    "valid": true,
+    "operation": "recordManualDecision",
+    "status": 200
+  },
+  {
+    "id": "manual_quota_reject",
+    "api": "loanflow",
+    "schema": "ManualDecisionReceipt",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "command": "APPROVE",
+      "decision": "REJECTED",
+      "application_status": "BANK_REJECTED",
+      "decided_at": "2026-11-09T10:00:00+04:00",
+      "rejection_reason_code": "MPL_QUOTA_EXHAUSTED"
+    },
+    "valid": true,
+    "operation": "recordManualDecision",
+    "status": 200
+  },
+  {
+    "id": "manual_reject_approved",
+    "api": "loanflow",
+    "schema": "ManualDecisionReceipt",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "command": "REJECT",
+      "decision": "APPROVED",
+      "application_status": "APPROVED",
+      "decided_at": "2026-11-09T10:00:00+04:00"
+    },
+    "valid": false,
+    "issue": "API-06",
+    "operation": "recordManualDecision",
+    "status": 200
+  },
+  {
+    "id": "manual_status_mismatch",
+    "api": "loanflow",
+    "schema": "ManualDecisionReceipt",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "command": "APPROVE",
+      "decision": "APPROVED",
+      "application_status": "BANK_REJECTED",
+      "decided_at": "2026-11-09T10:00:00+04:00"
+    },
+    "valid": false,
+    "issue": "API-06",
+    "operation": "recordManualDecision",
+    "status": 200
+  },
+  {
+    "id": "manual_missing_reason",
+    "api": "loanflow",
+    "schema": "ManualDecisionReceipt",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "command": "APPROVE",
+      "decision": "REJECTED",
+      "application_status": "BANK_REJECTED",
+      "decided_at": "2026-11-09T10:00:00+04:00"
+    },
+    "valid": false,
+    "issue": "API-06",
+    "operation": "recordManualDecision",
+    "status": 200
+  },
+  {
+    "id": "manual_approval_with_reason",
+    "api": "loanflow",
+    "schema": "ManualDecisionReceipt",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "command": "APPROVE",
+      "decision": "APPROVED",
+      "application_status": "APPROVED",
+      "decided_at": "2026-11-09T10:00:00+04:00",
+      "rejection_reason_code": "X"
+    },
+    "valid": false,
+    "issue": "API-06",
+    "operation": "recordManualDecision",
+    "status": 200
+  },
+  {
+    "id": "metrics_empty",
+    "api": "loanflow",
+    "schema": "UnderwriterWeeklyMetrics",
+    "body": {
+      "underwriter_id": "synthetic-underwriter",
+      "decision_count": 0,
+      "median_time_to_decision_seconds": null,
+      "approval_rate": null,
+      "overdue_count": 0,
+      "observed_loan_count": 0,
+      "overdue_rate": null
+    },
+    "valid": true
+  },
+  {
+    "id": "metrics_populated",
+    "api": "loanflow",
+    "schema": "UnderwriterWeeklyMetrics",
+    "body": {
+      "underwriter_id": "synthetic-underwriter",
+      "decision_count": 5,
+      "median_time_to_decision_seconds": 10800,
+      "approval_rate": 0.8,
+      "overdue_count": 1,
+      "observed_loan_count": 2,
+      "overdue_rate": 0.5
+    },
+    "valid": true
+  },
+  {
+    "id": "abs_NOT_FOUND",
+    "api": "abs",
+    "schema": "NotFound",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "state": "NOT_FOUND"
+    },
+    "valid": true,
+    "operation": "readInstruction",
+    "status": 200
+  },
+  {
+    "id": "abs_PENDING",
+    "api": "abs",
+    "schema": "Pending",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "state": "PENDING"
+    },
+    "valid": true,
+    "operation": "readInstruction",
+    "status": 200
+  },
+  {
+    "id": "abs_CLOSED",
+    "api": "abs",
+    "schema": "Closed",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "state": "CLOSED"
+    },
+    "valid": true,
+    "operation": "readInstruction",
+    "status": 200
+  },
+  {
+    "id": "abs_posted",
+    "api": "abs",
+    "schema": "Posted",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "state": "POSTED",
+      "posting_ref": "synthetic-posting",
+      "account_ref": "synthetic-account",
+      "amount_minor": 5000000,
+      "currency": "RUB",
+      "posted_at": "2026-11-09T10:00:00+04:00"
+    },
+    "valid": true,
+    "operation": "readInstruction",
+    "status": 200
+  },
+  {
+    "id": "abs_posted_missing_posting_ref",
+    "api": "abs",
+    "schema": "Posted",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "state": "POSTED",
+      "account_ref": "synthetic-account",
+      "amount_minor": 5000000,
+      "currency": "RUB",
+      "posted_at": "2026-11-09T10:00:00+04:00"
+    },
+    "valid": false,
+    "operation": "readInstruction",
+    "status": 200
+  },
+  {
+    "id": "abs_posted_missing_account_ref",
+    "api": "abs",
+    "schema": "Posted",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "state": "POSTED",
+      "posting_ref": "synthetic-posting",
+      "amount_minor": 5000000,
+      "currency": "RUB",
+      "posted_at": "2026-11-09T10:00:00+04:00"
+    },
+    "valid": false,
+    "operation": "readInstruction",
+    "status": 200
+  },
+  {
+    "id": "abs_posted_missing_amount_minor",
+    "api": "abs",
+    "schema": "Posted",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "state": "POSTED",
+      "posting_ref": "synthetic-posting",
+      "account_ref": "synthetic-account",
+      "currency": "RUB",
+      "posted_at": "2026-11-09T10:00:00+04:00"
+    },
+    "valid": false,
+    "operation": "readInstruction",
+    "status": 200
+  },
+  {
+    "id": "abs_posted_missing_currency",
+    "api": "abs",
+    "schema": "Posted",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "state": "POSTED",
+      "posting_ref": "synthetic-posting",
+      "account_ref": "synthetic-account",
+      "amount_minor": 5000000,
+      "posted_at": "2026-11-09T10:00:00+04:00"
+    },
+    "valid": false,
+    "operation": "readInstruction",
+    "status": 200
+  },
+  {
+    "id": "abs_posted_missing_posted_at",
+    "api": "abs",
+    "schema": "Posted",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "state": "POSTED",
+      "posting_ref": "synthetic-posting",
+      "account_ref": "synthetic-account",
+      "amount_minor": 5000000,
+      "currency": "RUB"
+    },
+    "valid": false,
+    "operation": "readInstruction",
+    "status": 200
+  },
+  {
+    "id": "abs_closed_with_requisites",
+    "api": "abs",
+    "schema": "Closed",
+    "body": {
+      "instruction_id": "10000000-0000-0000-0000-000000000001",
+      "state": "CLOSED",
+      "amount_minor": 1
+    },
+    "valid": false,
+    "operation": "readInstruction",
+    "status": 200
+  },
+  {
+    "id": "abs_amount_max",
+    "api": "abs",
+    "schema": "InstructionPayload",
+    "body": {
+      "account_ref": "synthetic",
+      "amount_minor": 9223372036854775807,
+      "currency": "RUB"
+    },
+    "valid": true
+  },
+  {
+    "id": "abs_amount_overflow",
+    "api": "abs",
+    "schema": "InstructionPayload",
+    "body": {
+      "account_ref": "synthetic",
+      "amount_minor": 9223372036854775808,
+      "currency": "RUB"
+    },
+    "valid": false
+  },
+  {
+    "id": "nullable_patch",
+    "api": "loanflow",
+    "schema": "DraftPatch",
+    "body": {
+      "requested_amount_minor": null,
+      "requested_term_months": null
+    },
+    "valid": true
+  },
+  {
+    "id": "empty_patch",
+    "api": "loanflow",
+    "schema": "DraftPatch",
+    "body": {},
+    "valid": false
+  },
+  {
+    "id": "bad_uuid",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "not-a-uuid",
+      "state": "OPEN",
+      "expires_at": "2026-11-09T10:05:00+04:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 2,
+      "can_resend": true,
+      "can_verify": true
+    },
+    "valid": false,
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "no_timezone",
+    "api": "loanflow",
+    "schema": "SigningAttemptView",
+    "body": {
+      "attempt_id": "10000000-0000-0000-0000-000000000001",
+      "state": "OPEN",
+      "expires_at": "2026-11-09T10:05:00",
+      "offer_expires_at": "2026-11-16T10:00:00+04:00",
+      "resends_remaining": 2,
+      "can_resend": true,
+      "can_verify": true
+    },
+    "valid": false,
+    "operation": "getSigningAttempt",
+    "status": 200
+  },
+  {
+    "id": "extra_secret",
+    "api": "loanflow",
+    "schema": "ApplicationView",
+    "body": {
+      "application_id": "10000000-0000-0000-0000-000000000001",
+      "status": "DRAFT",
+      "created_at": "2026-11-09T10:00:00+04:00",
+      "submitted_at": null,
+      "requested_amount_minor": null,
+      "requested_term_months": null,
+      "offer_availability": "NONE",
+      "offer_expires_at": null,
+      "active_attempt_id": null,
+      "contract_id": null,
+      "display_reason": null,
+      "available_actions": [
+        "EDIT_DRAFT",
+        "SUBMIT",
+        "CANCEL_APPLICATION"
+      ],
+      "account_ref": "synthetic-secret"
+    },
+    "valid": false,
+    "operation": "getOwnApplication",
+    "status": 200
+  }
+]
