@@ -54,10 +54,23 @@ nav:
       - Глоссарий и регуляторика: 01-business/1.2-glossary-and-regulations.md
       - Vision & Scope (BRD): 01-business/1.3-brd.md
       - Реестр открытых вопросов: 01-business/action-tracker.md
-  - Процессы: 02-processes/index.md
-  - Требования: 03-requirements/index.md
-  - Модель данных: 04-data/index.md
-  - API: 05-api/index.md
-  - Интеграции: 06-integrations/index.md
+  - Процессы:
+      - 02-processes/index.md
+      - Статусная модель: 02-processes/1.5-status-model.md
+  - Требования:
+      - 03-requirements/index.md
+      - 1.6. Требования MVP: 03-requirements/1.6-mvp-requirements.md
+  - Модель данных:
+      - 04-data/index.md
+      - 2.1. Логическая ER-модель: 04-data/2.1-logical-er-model.md
+      - 2.2. Физическая модель данных и DDL PostgreSQL: 04-data/2.2-physical-model-postgresql.md
+      - 2.4. SQL-практикум: 04-data/2.4-sql-practicum.md
+  - API:
+      - 05-api/index.md
+      - 2.3. API и OpenAPI-контракт: 05-api/2.3-openapi-contract.md
+  - Интеграции:
+      - 06-integrations/index.md
+      - Контракт учебной АБС: 06-integrations/abs-contract.md
   - Архитектура: 07-architecture/index.md
+  - 1.7. Прототипы: 08-prototypes/index.md
   - Архитектурные решения: decisions/index.md

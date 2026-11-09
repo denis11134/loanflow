@@ -1,0 +1,729 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LoanFlow · Прототип MVP</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f2f5f9; color: #17243a; font: 1rem/1.5 system-ui, sans-serif; }
+    main { max-width: 53rem; margin: auto; padding: clamp(.75rem, 3vw, 2rem); }
+    h1, h2, h3, p { margin: 0 0 .75rem; }
+    h1 { font-size: 1.8rem; }
+    h2 { font-size: 1.35rem; }
+    h3 { font-size: 1.1rem; }
+    .eyebrow { color: #405d85; font-size: .875rem; font-weight: 700; }
+    .muted { color: #485870; }
+    .panel { background: #fff; border: 1px solid #cbd5e1; border-radius: .75rem; padding: clamp(.875rem, 3vw, 1.5rem); }
+    .roles { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 21rem); gap: 1rem; align-items: start; }
+    #screen { min-height: 16rem; }
+    label, legend { font-weight: 650; }
+    input, select, button { font: inherit; }
+    input, select { display: block; width: 100%; min-height: 2.75rem; margin: .25rem 0 .75rem; padding: .375rem .625rem; border: 1px solid #8190a6; border-radius: .375rem; background: white; color: inherit; }
+    button { min-height: 2.75rem; padding: .4rem .75rem; border: 1px solid #8190a6; border-radius: .375rem; background: #fff; color: inherit; cursor: pointer; }
+    button:hover { background: #edf3ff; }
+    button.primary, button[aria-pressed="true"] { background: #16468b; color: #fff; border-color: #16468b; }
+    button.primary:hover, button[aria-pressed="true"]:hover { background: #0e3470; }
+    button.danger { color: #8f2020; border-color: #ae5e5e; }
+    button:disabled { opacity: .62; cursor: default; }
+    :focus-visible { outline: 3px solid #946300; outline-offset: 3px; }
+    .actions { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .75rem; }
+    .status { display: inline-block; background: #e8f0ff; border-radius: .375rem; padding: .25rem .5rem; font-size: .875rem; }
+    code { overflow-wrap: anywhere; }
+    .notice, .warning { border-radius: .375rem; padding: .625rem .75rem; }
+    .notice { background: #e8f0ff; }
+    .warning { background: #fff3d3; }
+    .facts { margin: .75rem 0; }
+    .facts > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .5rem; border-bottom: 1px solid #e2e8f0; padding: .4rem 0; }
+    dt { color: #485870; }
+    dd { margin: 0; overflow-wrap: anywhere; }
+    #lab { background: #f9fbff; }
+    summary { cursor: pointer; padding: .5rem 0; font-weight: 700; }
+    #lab-events button { width: 100%; text-align: left; }
+    [hidden] { display: none !important; }
+    @media (max-width: 47rem) { .layout { grid-template-columns: minmax(0, 1fr); } }
+    @media (max-width: 26rem) { #screen .actions > button { width: 100%; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">LoanFlow · Шаг 1.7</p>
+      <h1>Прототип кредитного конвейера</h1>
+      <p class="muted">Одна учебная заявка для всех ролей. SMS, время и ответы АБС имитируются на панели демонстрации.</p>
+    </header>
+    <nav class="roles" id="roles" aria-label="Экраны ролей">
+      <button type="button" data-role="mobile">Мобильное приложение</button>
+      <button type="button" data-role="contact">КЦ</button>
+      <button type="button" data-role="branch">Отделение</button>
+      <button type="button" data-role="underwriter">Андеррайтер</button>
+      <button type="button" data-role="reconciliation">Оператор сверки</button>
+    </nav>
+    <div class="layout">
+      <section class="panel" id="screen" aria-label="Экран выбранной роли">
+        <h2 id="screen-title" tabindex="-1"></h2>
+        <p id="notice" class="notice" role="status" hidden></p>
+        <div id="role-content"></div>
+      </section>
+      <aside class="panel" id="lab" aria-labelledby="lab-title">
+        <h2 id="lab-title">Панель демонстрации</h2>
+        <p class="muted">Синтетические данные. Загрузка сценария заменяет текущий пример. При смене роли пример сохраняется.</p>
+        <form id="scenario-form">
+          <label for="scenario">Сценарий</label>
+          <select id="scenario"></select>
+          <button type="submit">Загрузить сценарий</button>
+        </form>
+        <details id="simulation">
+          <summary>Время и события стенда</summary>
+          <div id="lab-state" aria-live="polite"></div>
+          <div class="actions" id="lab-events"></div>
+        </details>
+      </aside>
+    </div>
+    <noscript>Для работы прототипа включите JavaScript.</noscript>
+  </main>
+
+  <script>
+    "use strict";
+
+    const minute = 60_000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+    const startTime = Date.parse("2026-11-09T10:00:00+04:00");
+    const smsCode = "123456";
+    const annualRate = 0.2;
+    const costLimit = 0.25;
+    const applicationId = "APP-DEMO-001";
+    const instructionId = "INST-DEMO-001";
+    const dateTime = new Intl.DateTimeFormat("ru-RU", {
+      dateStyle: "short", timeStyle: "short", timeZone: "Europe/Samara",
+    });
+    const number = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 });
+    const money = value => `${number.format(value)} ₽`;
+    const time = value => `${dateTime.format(value)} (Самара)`;
+
+    const labels = {
+      DRAFT: "Черновик",
+      SCORING: "Ожидаем результат оценки",
+      UNDERWRITING: "Ручное рассмотрение",
+      APPROVED: "Заявка одобрена",
+      SIGNING_IN_PROGRESS: "Подписание",
+      BANK_REJECTED: "Банк отказал",
+      CLIENT_CANCELED: "Заявка отменена",
+      OFFER_EXPIRED: "Срок предложения истёк",
+      SYSTEM_ERROR: "Технический сбой",
+      CONTRACT_SIGNED: "Договор подписан",
+      COOLING_OFF: "Период охлаждения",
+      CANCELED_BY_CLIENT: "Отказ от получения кредита оформлен",
+      DISBURSEMENT_PROCESSING: "Выдача в обработке",
+      DISBURSED: "Кредит выдан",
+      DISBURSEMENT_FAILED: "Выдача не состоялась",
+    };
+    const roles = {
+      mobile: "Мобильное приложение",
+      contact: "Контакт-центр",
+      branch: "Отделение",
+      underwriter: "Очередь андеррайтера",
+      reconciliation: "Сверка выдачи",
+    };
+    const activeApplications = ["SCORING", "UNDERWRITING", "APPROVED", "SIGNING_IN_PROGRESS"];
+    const activeContracts = ["COOLING_OFF", "DISBURSEMENT_PROCESSING", "DISBURSED"];
+    const cancelableApplications = ["DRAFT", "SCORING", "UNDERWRITING", "APPROVED"];
+    const closeableResults = ["NOT_FOUND", "PENDING"];
+
+    const scenarios = {
+      "Подача и решение": {
+        journey: { name: "Полный путь · черновик и выдача" },
+        incomplete: { name: "Черновик без суммы", amount: 0 },
+        duplicate: { name: "Подача при активной заявке", otherApplication: true },
+        existing: { name: "Подача при действующем договоре", otherContract: true },
+        nonPayroll: { name: "Подача незарплатным клиентом", nonPayroll: true },
+        rejected: { name: "Нейтральный отказ при оценке", stage: "SCORING", score: "rejected" },
+        selfBan: { name: "Отказ из-за самозапрета", stage: "SCORING", score: "selfBan" },
+        noConsent: { name: "Отказ · нет действующего согласия", stage: "SCORING", score: "noConsent" },
+        systemError: { name: "Технический сбой при оценке", stage: "SCORING", score: "error" },
+        manual: { name: "Ручное рассмотрение", stage: "UNDERWRITING" },
+        escalated: { name: "Ручное рассмотрение · SLA нарушен", stage: "UNDERWRITING", escalated: true },
+        quota: { name: "Ручное одобрение · квоты нет", stage: "UNDERWRITING", score: "noQuota" },
+        costLimit: { name: "ПСК выше тестового предела", stage: "SCORING", annualCost: 0.26 },
+      },
+      "ИУ, SMS и охлаждение": {
+        beforeTerms: { name: "Одобрено · ИУ ещё не предоставлены", stage: "APPROVED", termsReady: false },
+        termsError: { name: "Сбой предоставления ИУ", stage: "APPROVED", termsReady: false, termsFail: true },
+        noCooling: { name: "ИУ · 49 999 ₽ без охлаждения", stage: "APPROVED", amount: 49_999 },
+        lowerLimit: { name: "ИУ · 50 000 ₽ и предупреждение о ПДН", stage: "APPROVED", amount: 50_000, highPdn: true },
+        upperLimit: { name: "ИУ · 200 000 ₽ с охлаждением 4 часа", stage: "APPROVED", amount: 200_000 },
+        longCooling: { name: "ИУ · 200 001 ₽ с охлаждением 48 часов", stage: "APPROVED", amount: 200_001 },
+        offerDeadline: { name: "SMS · до дедлайна предложения 2 минуты", stage: "SIGNING_IN_PROGRESS", nearDeadline: true },
+        smsTimeout: { name: "SMS · неизвестный исход проверки", stage: "SIGNING_IN_PROGRESS", smsUnknown: true },
+        cooling: { name: "Охлаждение · отказ в МП или КЦ", stage: "COOLING_OFF" },
+      },
+      "Выдача и проверка статуса": {
+        processing: { name: "Выдача в обработке · ожидаем ответ АБС", stage: "DISBURSEMENT_PROCESSING", amount: 49_999 },
+        missing: { name: "Сверка · распоряжение не найдено", abs: "NOT_FOUND", amount: 49_999 },
+        pending: { name: "Сверка · распоряжение в обработке", abs: "PENDING", amount: 49_999 },
+        lostClose: { name: "Сверка · потеря ответа на закрытие", abs: "PENDING", amount: 49_999, loseCloseResponse: true },
+        posted: { name: "Сверка · АБС подтвердила проводку", abs: "POSTED", amount: 49_999 },
+        closed: { name: "Сверка · АБС закрыла распоряжение", abs: "CLOSED", amount: 49_999 },
+        unavailable: { name: "Проверка статуса недоступна", stage: "APPROVED", lookupUnavailable: true },
+      },
+    };
+    const fixtures = Object.assign({}, ...Object.values(scenarios));
+
+    let role = "mobile";
+    let state;
+    let fixture;
+    let notice = "";
+
+    function reserveState() {
+      if (state.contract === "DISBURSED") return "Списан";
+      if (["CANCELED_BY_CLIENT", "DISBURSEMENT_FAILED"].includes(state.contract)) return "Освобождён";
+      if (["APPROVED", "SIGNING_IN_PROGRESS", "CONTRACT_SIGNED"].includes(state.application)) return "Удерживается";
+      return state.offerDeadline || state.hadOffer ? "Освобождён" : "Отсутствует";
+    }
+
+    function fiveWorkingDays(from) {
+      // Тестовый календарь содержит рабочие дни с понедельника по пятницу.
+      const zoneOffset = 4 * hour;
+      let left = 5;
+      while (left > 0) {
+        from += day;
+        const weekday = new Date(from + zoneOffset).getUTCDay();
+        if (weekday > 0 && weekday < 6) left -= 1;
+      }
+      return from;
+    }
+
+    function provideTerms() {
+      if (state.application !== "APPROVED" || state.offerDeadline) return;
+      if (fixture.termsFail) {
+        state.application = "SYSTEM_ERROR";
+        return;
+      }
+      state.offerDeadline = fiveWorkingDays(state.now);
+    }
+
+    function approve() {
+      if (!["SCORING", "UNDERWRITING"].includes(state.application)) return;
+      if (fixture.score === "noQuota" || (fixture.annualCost ?? annualRate) > costLimit) {
+        state.application = "BANK_REJECTED";
+        return;
+      }
+      state.application = "APPROVED";
+      state.hadOffer = true;
+      if (fixture.termsReady !== false) provideTerms();
+    }
+
+    function enterQueue() {
+      state.application = "UNDERWRITING";
+      // Для демонстрации вход в очередь приходится на рабочий понедельник в 10:00.
+      state.slaDeadline = state.now + hour;
+    }
+
+    function coolingHours() {
+      if (state.amount < 50_000) return 0;
+      return state.amount <= 200_000 ? 4 : 48;
+    }
+
+    function startSigning() {
+      if (state.application !== "APPROVED" || !state.offerDeadline || state.now >= state.offerDeadline) return;
+      state.application = "SIGNING_IN_PROGRESS";
+      state.attempt = { deadline: state.now + 5 * minute, resends: 0, verifying: false };
+      state.termsOpen = false;
+    }
+
+    function endAttempt(message) {
+      state.attempt = null;
+      state.application = state.now >= state.offerDeadline ? "OFFER_EXPIRED" : "APPROVED";
+      if (role === "mobile") notice = state.application === "OFFER_EXPIRED" ? "Срок предложения истёк." : message;
+    }
+
+    function startDisbursement() {
+      state.contract = "DISBURSEMENT_PROCESSING";
+      state.outbox = { id: instructionId, attempted: false, finished: false };
+    }
+
+    function sign() {
+      if (!state.attempt || state.application !== "SIGNING_IN_PROGRESS") return;
+      if (state.now >= Math.min(state.attempt.deadline, state.offerDeadline)) return;
+      state.application = "CONTRACT_SIGNED";
+      state.attempt = null;
+      state.signedAt = state.now;
+      if (coolingHours()) {
+        state.contract = "COOLING_OFF";
+        state.coolingUntil = state.signedAt + coolingHours() * hour;
+      } else {
+        startDisbursement();
+      }
+    }
+
+    function advanceTo(target) {
+      state.now = target;
+      if (["APPROVED", "SIGNING_IN_PROGRESS"].includes(state.application) &&
+          state.offerDeadline && state.now >= state.offerDeadline) {
+        endAttempt();
+      } else if (state.attempt && state.now >= state.attempt.deadline) {
+        endAttempt("Время ввода кода истекло. Начните подписание заново.");
+      }
+      if (state.application === "UNDERWRITING" && state.now > state.slaDeadline) state.escalated = true;
+      if (state.contract === "COOLING_OFF" && state.now >= state.coolingUntil) {
+        startDisbursement();
+      }
+    }
+
+    function applyAbsResult(result, id) {
+      if (state.contract !== "DISBURSEMENT_PROCESSING" || state.outbox.id !== id) return;
+      if (!["POSTED", "CLOSED"].includes(result)) return;
+      state.contract = result === "POSTED" ? "DISBURSED" : "DISBURSEMENT_FAILED";
+      state.outbox.finished = true;
+    }
+
+    function recordAbsResult(result) {
+      if (["POSTED", "CLOSED"].includes(state.abs)) return;
+      state.abs = result;
+      if (result === "POSTED") state.postedAt = state.now;
+    }
+
+    function sendInstruction(result) {
+      if (state.contract !== "DISBURSEMENT_PROCESSING" || state.outbox.attempted) return;
+      state.outbox.attempted = true;
+      if (result === "TIMEOUT") {
+        recordAbsResult("PENDING");
+        return;
+      }
+      recordAbsResult(result);
+      applyAbsResult(state.abs, state.outbox.id);
+    }
+
+    function canReconcile() {
+      return state.contract === "DISBURSEMENT_PROCESSING" && state.outbox.attempted;
+    }
+
+    function canClose() {
+      return canReconcile() && (closeableResults.includes(state.lastRead) || state.closeResponseLost);
+    }
+
+    function readInstruction() {
+      if (!canReconcile()) return;
+      state.lastRead = state.nextReadResult || state.abs;
+      state.nextReadResult = null;
+      state.reconciliationResult = state.lastRead;
+      applyAbsResult(state.lastRead, state.outbox.id);
+    }
+
+    function closeInstruction() {
+      if (!canClose()) return;
+      recordAbsResult("CLOSED");
+      if (fixture.loseCloseResponse && !state.closeResponseLost) {
+        state.closeResponseLost = true;
+        state.reconciliationResult = "CLOSE_TIMEOUT";
+        return;
+      }
+      state.reconciliationResult = state.abs;
+      applyAbsResult(state.abs, state.outbox.id);
+    }
+
+    function loadScenario(key) {
+      fixture = fixtures[key];
+      state = {
+        now: startTime, application: "DRAFT", amount: fixture.amount ?? 120_000, term: 12,
+        offerDeadline: null, attempt: null, contract: null, identified: false, abs: "NOT_FOUND",
+      };
+      notice = "";
+      if (fixture.stage === "SCORING") state.application = "SCORING";
+      if (fixture.stage === "UNDERWRITING") {
+        enterQueue();
+        if (fixture.escalated) advanceTo(state.slaDeadline + minute);
+      }
+      if (["APPROVED", "SIGNING_IN_PROGRESS", "COOLING_OFF"].includes(fixture.stage)) {
+        state.application = "SCORING";
+        approve();
+        if (fixture.nearDeadline) advanceTo(state.offerDeadline - 2 * minute);
+        if (fixture.stage !== "APPROVED") startSigning();
+        if (fixture.stage === "COOLING_OFF") sign();
+      }
+      if (fixture.stage === "DISBURSEMENT_PROCESSING" || fixture.abs) {
+        state.application = "CONTRACT_SIGNED";
+        state.hadOffer = true;
+        state.signedAt = startTime;
+        startDisbursement();
+        if (fixture.abs) {
+          state.outbox.attempted = true;
+          recordAbsResult(fixture.abs);
+        }
+      }
+      render();
+    }
+
+    const status = value => `<p class="status"><code>${value}</code></p>`;
+    const facts = rows => `<dl class="facts">${rows.map(([key, value]) =>
+      `<div><dt>${key}</dt><dd>${value}</dd></div>`).join("")}</dl>`;
+    const button = (action, label, style = "") =>
+      `<button type="button" data-action="${action}" class="${style}">${label}</button>`;
+    const actions = (...buttons) => `<div class="actions">${buttons.join("")}</div>`;
+
+    function draft() {
+      return `<p>Укажите желаемую сумму и срок. Можно сохранить черновик и вернуться к нему позже.</p>
+        <form id="draft-form">
+          <label for="amount">Сумма, ₽</label>
+          <input id="amount" name="amount" type="number" min="1" step="1" inputmode="numeric" value="${state.amount || ""}">
+          <label for="term">Срок, мес.</label>
+          <input id="term" name="term" type="number" min="1" step="1" inputmode="numeric" value="${state.term || ""}">
+          <div class="actions">
+            <button type="submit" value="save">Сохранить черновик</button>
+            <button class="primary" type="submit" value="submit">Подать заявку</button>
+            ${button("cancelApplication", "Отменить заявку", "danger")}
+          </div>
+        </form>`;
+    }
+
+    function offer() {
+      const monthlyRate = annualRate / 12;
+      const payment = state.amount * monthlyRate / (1 - (1 + monthlyRate) ** -state.term);
+      const cost = payment * state.term - state.amount;
+      return `<h3>Индивидуальные условия</h3>
+        ${facts([
+          ["Сумма", money(state.amount)], ["Срок", `${state.term} мес.`], ["Ставка", "20% годовых"],
+          ["Платёж в месяц", money(payment)], ["ПСК", `20% годовых · ${money(cost)}`],
+        ])}
+        ${button("hideTerms", "Свернуть ИУ")}`;
+    }
+
+    function approved() {
+      if (!state.offerDeadline) {
+        return `<p>Индивидуальные условия готовятся. Подписание станет доступно после их предоставления.</p>
+          ${actions(button("cancelApplication", "Отменить заявку", "danger"))}`;
+      }
+      const hours = coolingHours();
+      return `<p>Предложение действует до <strong>${time(state.offerDeadline)}</strong>.</p>
+        <p>${hours
+          ? `После подписания действует охлаждение ${hours} ч. В этот период можно отказаться от получения кредита в приложении или через КЦ.`
+          : "Выдача начнётся сразу после подписания. После запуска выдачи отказаться от получения кредита нельзя."}</p>
+        ${state.pdnWarning ? '<p class="warning">Ваш показатель долговой нагрузки выше 50%. Оцените, сможете ли вы вносить платежи по кредиту.</p>' : ""}
+        ${state.termsOpen ? offer() : button("showTerms", "Посмотреть ИУ")}
+        ${actions(button("startSigning", "Подписать", "primary"), button("cancelApplication", "Отменить заявку", "danger"))}`;
+    }
+
+    function signing() {
+      const attempt = state.attempt;
+      const deadline = Math.min(attempt.deadline, state.offerDeadline);
+      if (attempt.verifying) {
+        const message = attempt.screenClosed
+          ? "Проверяем код. Результат появится в статусе заявки."
+          : "Проверяем код. Можно свернуть экран и вернуться к результату.";
+        return `<p><strong>${message}</strong></p>
+          <p>Результат ожидается до <strong>${time(deadline)}</strong>.</p>
+          ${button("toggleVerification", attempt.screenClosed ? "Вернуться к проверке кода" : "Свернуть экран подписания")}`;
+      }
+      return `<p>Код отправлен по SMS и действует до <strong>${time(deadline)}</strong>.</p>
+        <form id="sms-form">
+            <label for="sms">Код из SMS</label>
+            <input id="sms" name="sms" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>
+            <div class="actions">
+              <button class="primary" type="submit">Подтвердить подписание</button>
+              <button type="button" data-action="resendSms" ${attempt.resends >= 2 ? "disabled" : ""}>
+                Отправить код ещё раз (${2 - attempt.resends})
+              </button>
+            </div>
+        </form>`;
+    }
+
+    function coolingTime() {
+      return `<p>Запуск выдачи возможен с <strong>${time(state.coolingUntil)}</strong>.</p>`;
+    }
+
+    function mobile() {
+      if (fixture.lookupUnavailable) return "<p>Сейчас получить статус невозможно. Попробуйте позже.</p>";
+      const stage = state.contract || state.application;
+      const messages = {
+        SCORING: "Заявка подана. Проверяем данные и оцениваем заявку.",
+        UNDERWRITING: "Андеррайтер рассматривает заявку. Решение появится здесь.",
+        BANK_REJECTED: rejectionMessage(),
+        CLIENT_CANCELED: "Заявка отменена по вашему запросу.",
+        OFFER_EXPIRED: "Подписать это предложение больше нельзя.",
+        SYSTEM_ERROR: "Завершить оформление не удалось из-за технического сбоя.",
+        CANCELED_BY_CLIENT: "Вы отказались от получения кредита. Деньги не будут зачислены.",
+        DISBURSEMENT_PROCESSING: "Ожидаем подтверждения зачисления. Отказ от получения кредита уже недоступен.",
+        DISBURSEMENT_FAILED: "АБС подтвердила, что зачисления не будет.",
+      };
+      const screens = {
+        DRAFT: draft,
+        APPROVED: approved,
+        SIGNING_IN_PROGRESS: signing,
+        COOLING_OFF: () => coolingTime() + "<p>Договор подписан. До запуска выдачи вы можете отказаться от получения кредита.</p>" +
+          actions(button("cancelCooling", "Отказаться от получения кредита", "danger")),
+        DISBURSED: () => facts([["Сумма", money(state.amount)], ["Время зачисления", time(state.postedAt)]]),
+      };
+      const content = screens[stage] ? screens[stage]() : `<p>${messages[stage]}</p>`;
+      const cancel = ["SCORING", "UNDERWRITING"].includes(stage)
+        ? actions(button("cancelApplication", "Отменить заявку", "danger")) : "";
+      return `<h3>${labels[stage]}</h3>${status(stage)}${content}${cancel}`;
+    }
+
+    function rejectionMessage() {
+      if (state.rejection === "selfBan") return "Заявка отклонена из-за действующего самозапрета на кредиты.";
+      if (state.rejection === "noConsent") return "Заявка отклонена. Для оценки нужно действующее согласие на запрос кредитного отчёта.";
+      return "По этой заявке кредит не одобрен.";
+    }
+
+    function contact() {
+      if (fixture.lookupUnavailable) return "<p>Сейчас получить статус невозможно. Попробуйте позже.</p>";
+      const stage = state.contract || state.application;
+      const heading = `<h3>${labels[stage]}</h3>${status(stage)}`;
+      if (stage === "COOLING_OFF") {
+        const controls = state.identified
+          ? '<p>Клиент идентифицирован.</p>' + actions(button("cancelCooling", "Оформить отказ от получения кредита", "danger"))
+          : "<p>Для оформления отказа идентифицируйте клиента.</p>";
+        return heading + coolingTime() + controls;
+      }
+      if (stage === "DISBURSED") return heading + facts([["Время зачисления", time(state.postedAt)]]);
+      if (stage === "DISBURSEMENT_PROCESSING") return heading + "<p>Оформление отказа недоступно после запуска выдачи.</p>";
+      return heading;
+    }
+
+    function branch() {
+      if (fixture.lookupUnavailable) return "<p>Сейчас выполнить проверку невозможно. Попробуйте позже.</p>";
+      const hasApplication = fixture.otherApplication || activeApplications.includes(state.application);
+      const hasContract = fixture.otherContract || activeContracts.includes(state.contract);
+      return '<p class="muted">Проверка по учебному клиенту · только просмотр</p>' +
+        facts([["Активная заявка", hasApplication ? "Есть" : "Нет"],
+          ["Действующий договор", hasContract ? "Есть" : "Нет"]]);
+    }
+
+    function underwriter() {
+      if (state.application !== "UNDERWRITING") return "<p>В очереди нет заявок на ручное рассмотрение.</p>";
+      return `<h3>Заявка ${applicationId}</h3>${status(state.application)}
+        ${facts([["Дедлайн SLA", time(state.slaDeadline)]])}
+        ${state.escalated ? '<p class="warning">SLA нарушен. Заявка эскалирована руководителю.</p>' : ""}
+        ${actions(button("approve", "Одобрить", "primary"), button("reject", "Отказать", "danger"))}`;
+    }
+
+    function reconciliation() {
+      if (!state.outbox?.attempted) return "<p>Распоряжений для ручной сверки нет.</p>";
+      if (state.outbox.finished && !state.reconciliationResult) return "<p>Распоряжений для ручной сверки нет.</p>";
+      const outcomes = {
+        NOT_FOUND: "Запись по распоряжению не найдена. Сверка остаётся открытой.",
+        PENDING: "Распоряжение в обработке. Сверка остаётся открытой.",
+        POSTED: "Зачисление подтверждено.",
+        CLOSED: "Распоряжение окончательно закрыто. Исполнение заблокировано.",
+        TIMEOUT: state.closeResponseLost
+          ? "АБС не ответила на чтение. Можно прочитать снова или повторить ранее принятую команду закрытия."
+          : "АБС не ответила на чтение. Для закрытия нужен новый результат чтения.",
+        CONFLICT: state.closeResponseLost
+          ? "АБС вернула конфликт без подтверждения итога. Прочитайте состояние или повторите ранее принятую команду."
+          : "АБС вернула конфликт без подтверждения итога. Прочитайте состояние снова.",
+        CLOSE_TIMEOUT: "Ответ на закрытие не получен. Прочитайте состояние или повторите команду по тому же распоряжению.",
+      };
+      const result = state.reconciliationResult;
+      const resultText = result ? `<p><code>${result}</code> · ${outcomes[result]}</p>` : "<p>Прочитайте состояние исходного распоряжения.</p>";
+      const controls = state.outbox.finished ? "" : actions(
+        button("readInstruction", "Прочитать состояние АБС", "primary"),
+        canClose() ? button("closeInstruction", state.closeResponseLost
+          ? "Повторить закрытие" : "Запросить окончательное закрытие", "danger") : "",
+      );
+      return facts([["Распоряжение", `<code>${state.outbox.id}</code>`]]) + resultText + controls;
+    }
+
+    const screens = { mobile, contact, branch, underwriter, reconciliation };
+    const roleActions = {
+      mobile: {
+        showTerms() {
+          if (state.application !== "APPROVED" || !state.offerDeadline) return;
+          state.termsOpen = true;
+        },
+        hideTerms() { state.termsOpen = false; },
+        startSigning,
+        toggleVerification() {
+          if (!state.attempt?.verifying) return;
+          state.attempt.screenClosed = !state.attempt.screenClosed;
+        },
+        resendSms() {
+          if (!state.attempt || state.attempt.verifying || state.attempt.resends >= 2) return;
+          state.attempt.resends += 1;
+          notice = "SMS отправлено повторно. Срок действия кода не изменился.";
+        },
+        cancelApplication() {
+          if (!cancelableApplications.includes(state.application)) return;
+          state.application = "CLIENT_CANCELED";
+          notice = "Отмена заявки подтверждена.";
+        },
+        cancelCooling,
+      },
+      contact: { cancelCooling },
+      branch: {},
+      underwriter: {
+        approve() {
+          if (state.application !== "UNDERWRITING") return;
+          approve();
+          notice = state.application === "APPROVED" ? "Одобрение зафиксировано." : "Итог решения · отказ.";
+        },
+        reject() {
+          if (state.application !== "UNDERWRITING") return;
+          state.application = "BANK_REJECTED";
+          notice = "Отказ зафиксирован.";
+        },
+      },
+      reconciliation: { readInstruction, closeInstruction },
+    };
+
+    function cancelCooling() {
+      if (state.contract !== "COOLING_OFF" || (role === "contact" && !state.identified)) return;
+      state.contract = "CANCELED_BY_CLIENT";
+      notice = "Отказ от получения кредита подтверждён.";
+    }
+
+    function score() {
+      if (state.application !== "SCORING") return;
+      if (["selfBan", "noConsent", "rejected"].includes(fixture.score)) {
+        state.application = "BANK_REJECTED";
+        state.rejection = fixture.score;
+      } else if (fixture.score === "error") {
+        state.application = "SYSTEM_ERROR";
+      } else {
+        approve();
+      }
+    }
+
+    const events = [
+      [() => state.application === "SCORING", "Завершить оценку", score],
+      [() => state.application === "SCORING" && !fixture.score, "Направить на ручное рассмотрение", enterQueue],
+      [() => state.application === "UNDERWRITING" && !state.escalated, "Перейти за дедлайн SLA", () => advanceTo(state.slaDeadline + minute)],
+      [() => state.application === "APPROVED" && !state.offerDeadline, "Завершить предоставление ИУ", provideTerms],
+      [() => state.attempt && !state.attempt.verifying, "Имитировать сбой доставки SMS", () =>
+        endAttempt("Не удалось доставить SMS. Начните подписание заново.")],
+      [() => state.attempt?.verifying, "Вернуть успешный результат проверки кода", sign],
+      [() => state.attempt && state.attempt.deadline < state.offerDeadline, "К дедлайну попытки SMS", () => advanceTo(state.attempt.deadline)],
+      [() => ["APPROVED", "SIGNING_IN_PROGRESS"].includes(state.application) && state.offerDeadline,
+        "К дедлайну предложения", () => advanceTo(state.offerDeadline)],
+      [() => state.contract === "COOLING_OFF" && !state.identified, "Имитировать успешную идентификацию клиента в КЦ", () => {
+        state.identified = true;
+      }],
+      [() => state.contract === "COOLING_OFF", "К окончанию охлаждения", () => advanceTo(state.coolingUntil)],
+      [() => state.contract === "DISBURSEMENT_PROCESSING" && !state.outbox.attempted, "АБС подтвердила зачисление", () => sendInstruction("POSTED")],
+      [() => state.contract === "DISBURSEMENT_PROCESSING" && !state.outbox.attempted, "АБС подтвердила окончательное закрытие", () => sendInstruction("CLOSED")],
+      [() => state.contract === "DISBURSEMENT_PROCESSING" && !state.outbox.attempted, "Ответ АБС потерян · передать на сверку", () => sendInstruction("TIMEOUT")],
+      [() => canReconcile() && !state.nextReadResult, "Следующее чтение АБС завершится таймаутом", () => {
+        state.nextReadResult = "TIMEOUT";
+      }],
+      [() => canReconcile() && !state.nextReadResult, "Следующее чтение АБС вернёт конфликт", () => {
+        state.nextReadResult = "CONFLICT";
+      }],
+      [() => canReconcile() && state.abs === "PENDING", "АБС провела зачисление · итог доступен при сверке", () => recordAbsResult("POSTED")],
+    ];
+
+    const scenario = document.querySelector("#scenario");
+    const rolesNav = document.querySelector("#roles");
+    const screen = document.querySelector("#screen");
+    const screenTitle = document.querySelector("#screen-title");
+    const roleContent = document.querySelector("#role-content");
+    const noticeElement = document.querySelector("#notice");
+    const labState = document.querySelector("#lab-state");
+    const labEvents = document.querySelector("#lab-events");
+
+    for (const [groupName, group] of Object.entries(scenarios)) {
+      const optgroup = document.createElement("optgroup");
+      optgroup.label = groupName;
+      for (const [key, { name }] of Object.entries(group)) optgroup.append(new Option(name, key));
+      scenario.append(optgroup);
+    }
+
+    function render() {
+      for (const tab of rolesNav.querySelectorAll("button")) tab.setAttribute("aria-pressed", tab.dataset.role === role);
+      screen.dataset.role = role;
+      screenTitle.textContent = roles[role];
+      noticeElement.textContent = notice;
+      noticeElement.hidden = !notice;
+      if (role === "mobile" && state.application === "APPROVED" && state.offerDeadline &&
+          fixture.highPdn && !state.pdnWarning) {
+        state.pdnWarning = { shownAt: state.now, version: "demo-1" };
+      }
+      roleContent.innerHTML = screens[role]();
+
+      const details = [["Время стенда", time(state.now)], ["Резерв МПЛ", reserveState()]];
+      if (state.attempt && !state.attempt.verifying) details.push(["Код учебной SMS", `<code>${smsCode}</code>`]);
+      if (state.nextReadResult) details.push(["Следующее чтение АБС", state.nextReadResult]);
+      labState.innerHTML = facts(details);
+      labEvents.replaceChildren();
+      for (const [available, label, run] of events) {
+        if (!available()) continue;
+        const control = document.createElement("button");
+        control.type = "button";
+        control.textContent = label;
+        control.addEventListener("click", () => {
+          if (!available()) return;
+          notice = "";
+          run();
+          render();
+        });
+        labEvents.append(control);
+      }
+    }
+
+    rolesNav.addEventListener("click", event => {
+      const nextRole = event.target.closest("button")?.dataset.role;
+      if (!nextRole || nextRole === role) return;
+      role = nextRole;
+      notice = "";
+      render();
+    });
+
+    document.querySelector("#scenario-form").addEventListener("submit", event => {
+      event.preventDefault();
+      loadScenario(scenario.value);
+      document.querySelector("#simulation").open = true;
+    });
+
+    roleContent.addEventListener("click", event => {
+      const action = event.target.closest("button")?.dataset.action;
+      if (!action || !Object.hasOwn(roleActions[role], action)) return;
+      notice = "";
+      roleActions[role][action]();
+      render();
+      screenTitle.focus();
+    });
+
+    roleContent.addEventListener("input", event => {
+      if (role !== "mobile" || state.application !== "DRAFT") return;
+      if (event.target.id === "amount" || event.target.id === "term") {
+        state[event.target.id] = event.target.valueAsNumber || 0;
+      }
+    });
+
+    roleContent.addEventListener("submit", event => {
+      event.preventDefault();
+      if (role !== "mobile") return;
+      notice = "";
+      if (event.target.id === "draft-form" && state.application === "DRAFT") {
+        if (event.submitter?.value !== "submit") {
+          notice = "Черновик сохранён.";
+        } else if (!state.amount || !state.term) {
+          notice = !state.amount && !state.term ? "Укажите сумму и срок." : (!state.amount ? "Укажите сумму." : "Укажите срок.");
+        } else if (fixture.nonPayroll) {
+          notice = "Кредит в приложении доступен зарплатным клиентам банка.";
+        } else if (fixture.otherApplication || fixture.otherContract) {
+          notice = fixture.otherApplication ? "У вас уже есть активная заявка." : "У вас уже есть действующий договор.";
+        } else {
+          state.application = "SCORING";
+          notice = "Заявка принята.";
+          document.querySelector("#simulation").open = true;
+        }
+      }
+      if (event.target.id === "sms-form" && state.attempt && !state.attempt.verifying) {
+        const code = new FormData(event.target).get("sms");
+        if (code !== smsCode) {
+          endAttempt("Код неверный. Начните подписание заново.");
+        } else if (fixture.smsUnknown) {
+          state.attempt.verifying = true;
+        } else {
+          sign();
+        }
+      }
+      render();
+      screenTitle.focus();
+    });
+
+    loadScenario("journey");
+  </script>
+</body>
+</html>
