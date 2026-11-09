@@ -6,7 +6,7 @@ permissions:
   contents: read
 jobs:
   technical:
-    name: Документация, PostgreSQL и прототип
+    name: Документация, PostgreSQL, прототип и HTTP-сервисы
     runs-on: ubuntu-24.04
     env:
       PG_BINDIR: /usr/lib/postgresql/18/bin
@@ -21,6 +21,8 @@ jobs:
             requirements-checks.txt
             requirements-checks.lock.txt
             requirements-docs.txt
+            services/requirements.txt
+            services/requirements.lock.txt
       - run: python -m pip install -r requirements-checks.txt
       - name: PostgreSQL 18 из официального репозитория
         run: |
@@ -28,7 +30,7 @@ jobs:
           sudo curl --fail --silent --show-error https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
           echo 'deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main' | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
-          sudo apt-get install -y postgresql-18
+          sudo apt-get install -y postgresql-18 fonts-dejavu-core
       - run: python -m playwright install --with-deps chromium
       - run: python scripts/check.py --technical
       - uses: actions/upload-artifact@v4
@@ -49,6 +51,8 @@ jobs:
             requirements-checks.txt
             requirements-checks.lock.txt
             requirements-docs.txt
+            services/requirements.txt
+            services/requirements.lock.txt
       - run: python -m pip install -r requirements-checks.txt
       - run: python -m pytest -q --tb=short -m contracts --require-ready --junitxml=test-results/contracts.xml
       - uses: actions/upload-artifact@v4
