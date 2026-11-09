@@ -1,0 +1,3459 @@
+{
+  "info": {
+    "name": "LoanFlow · 3.4 Приёмка",
+    "description": "Приёмка на изолированном учебном стенде по задаче #17. Запускайте коллекцию через Collection Runner или Newman, чтобы работало ограниченное по времени ожидание.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.variables.unset('lf_http');",
+          "pm.variables.unset('lf_poll');"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const expected = pm.variables.get('lf_http');",
+          "const poll = pm.variables.get('lf_poll');",
+          "pm.test('HTTP ' + expected, () => {",
+          "    pm.expect(pm.response.code, pm.request.method + ' ' + pm.variables.replaceIn(pm.request.url.toString())).to.eql(expected);",
+          "});",
+          "",
+          "if (poll && pm.response.code === expected) {",
+          "    const body = pm.response.json();",
+          "    const actual = body[poll.field];",
+          "    const ready = actual === poll.target && (!poll.readyField || body[poll.readyField] === poll.readyValue);",
+          "    const expectedId = pm.collectionVariables.get(poll.idVar);",
+          "    const requestId = pm.info.requestId;",
+          "    const timeoutMs = Number(pm.environment.get('poll_timeout_ms'));",
+          "    const pollStarted = pm.collectionVariables.get('lf_poll_request') === requestId;",
+          "    const deadline = pollStarted ? Number(pm.collectionVariables.get('lf_poll_deadline')) : Date.now() + timeoutMs;",
+          "    const timedOut = !Number.isFinite(deadline) || Date.now() >= deadline;",
+          "    const stillPending = poll.pending.includes(actual);",
+          "    const observed = actual + (poll.readyField ? ' / ' + body[poll.readyField] : '');",
+          "    pm.test('Чтение относится к текущему ресурсу', () => {",
+          "        pm.expect(body[poll.idField || 'application_id']).to.eql(expectedId);",
+          "    });",
+          "",
+          "    if (ready || !stillPending || timedOut) {",
+          "        pm.collectionVariables.unset('lf_poll_request');",
+          "        pm.collectionVariables.unset('lf_poll_deadline');",
+          "        if (!ready || timedOut) {",
+          "            pm.execution.setNextRequest(null);",
+          "        }",
+          "        pm.test('Достигнут ' + poll.target + (poll.readyValue ? ' / ' + poll.readyValue : ''), () => {",
+          "            pm.expect(ready && !timedOut, 'Фактически ' + observed + ', лимит ожидания ' + timeoutMs + ' мс').to.eql(true);",
+          "        });",
+          "    } else {",
+          "        pm.collectionVariables.set('lf_poll_request', requestId);",
+          "        pm.collectionVariables.set('lf_poll_deadline', deadline);",
+          "        pm.execution.setNextRequest(requestId);",
+          "        setTimeout(() => {}, Math.min(250, Math.max(0, deadline - Date.now())));",
+          "    }",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "attempt_id",
+      "value": ""
+    },
+    {
+      "key": "attempt_receipt",
+      "value": ""
+    },
+    {
+      "key": "auto_app",
+      "value": ""
+    },
+    {
+      "key": "auto_notice",
+      "value": ""
+    },
+    {
+      "key": "auto_terms",
+      "value": ""
+    },
+    {
+      "key": "contract_id",
+      "value": ""
+    },
+    {
+      "key": "decision_key",
+      "value": ""
+    },
+    {
+      "key": "decision_receipt",
+      "value": ""
+    },
+    {
+      "key": "error_app",
+      "value": ""
+    },
+    {
+      "key": "foreign_error",
+      "value": ""
+    },
+    {
+      "key": "manual_app",
+      "value": ""
+    },
+    {
+      "key": "pdf_app",
+      "value": ""
+    },
+    {
+      "key": "pdf_terms",
+      "value": ""
+    },
+    {
+      "key": "pdn_at_app",
+      "value": ""
+    },
+    {
+      "key": "pdn_at_terms",
+      "value": ""
+    },
+    {
+      "key": "pdn_over_app",
+      "value": ""
+    },
+    {
+      "key": "psk_above_app",
+      "value": ""
+    },
+    {
+      "key": "psk_at_app",
+      "value": ""
+    },
+    {
+      "key": "psk_below_app",
+      "value": ""
+    },
+    {
+      "key": "range_app",
+      "value": ""
+    },
+    {
+      "key": "refusal_app",
+      "value": ""
+    },
+    {
+      "key": "sign_key",
+      "value": ""
+    },
+    {
+      "key": "submission_receipt",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 · Диапазон при подаче",
+      "description": "3.3 и FR-UC02-01. Неподходящие значения сохраняются в DRAFT. Подача возвращает 422.",
+      "item": [
+        {
+          "name": "Создать черновик",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 201);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const draft = pm.response.json();",
+                  "    pm.test('Создан DRAFT с заданными параметрами', () => {",
+                  "        pm.expect(draft.status).to.eql('DRAFT');",
+                  "        pm.expect(draft.requested_amount_minor).to.eql('99999');",
+                  "        pm.expect(draft.requested_term_months).to.eql(12);",
+                  "        pm.expect(draft.application_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    });",
+                  "    pm.collectionVariables.set('range_app', draft.application_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requested_amount_minor\": \"99999\",\n  \"requested_term_months\": 12\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Подать с суммой ниже минимума",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 422);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 422) {",
+                  "    pm.test('Код ошибки APPLICATION_PARAMETERS_OUT_OF_RANGE', () => {",
+                  "        pm.expect(pm.response.json().code).to.eql('APPLICATION_PARAMETERS_OUT_OF_RANGE');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{range_app}}/submission"
+          }
+        },
+        {
+          "name": "После отклонения суммы черновик сохранён",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Сумма сохранена, заявка не подана', () => {",
+                  "        const card = pm.response.json();",
+                  "        pm.expect(card.status).to.eql('DRAFT');",
+                  "        pm.expect(card.requested_amount_minor).to.eql('99999');",
+                  "        pm.expect(card.submitted_at).to.eql(null);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{range_app}}"
+          }
+        },
+        {
+          "name": "Сохранить срок выше максимума",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Срок 61 месяц сохранён в DRAFT', () => {",
+                  "        const card = pm.response.json();",
+                  "        pm.expect(card.status).to.eql('DRAFT');",
+                  "        pm.expect(card.requested_term_months).to.eql(61);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{range_app}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requested_amount_minor\": \"100000\",\n  \"requested_term_months\": 61\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Подать со сроком 61 месяц",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 422);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 422) {",
+                  "    pm.test('Код ошибки APPLICATION_PARAMETERS_OUT_OF_RANGE', () => {",
+                  "        pm.expect(pm.response.json().code).to.eql('APPLICATION_PARAMETERS_OUT_OF_RANGE');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{range_app}}/submission"
+          }
+        },
+        {
+          "name": "После отклонения срока черновик сохранён",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Заявка осталась в DRAFT без времени подачи', () => {",
+                  "        const card = pm.response.json();",
+                  "        pm.expect(card.status).to.eql('DRAFT');",
+                  "        pm.expect(card.requested_term_months).to.eql(61);",
+                  "        pm.expect(card.submitted_at).to.eql(null);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{range_app}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 · Автоматическое одобрение и выдача",
+      "description": "FR-UC01-01–09, FR-UC02-02, FR-UC05-02, FR-UC06-01. Сумма 49 999,99 ₽ даёт выдачу без охлаждения. Для SMS и проводки требуется тестовая подготовка.",
+      "item": [
+        {
+          "name": "Создать черновик",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 201);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const draft = pm.response.json();",
+                  "    pm.test('Создан DRAFT с заданными параметрами', () => {",
+                  "        pm.expect(draft.status).to.eql('DRAFT');",
+                  "        pm.expect(draft.requested_amount_minor).to.eql('4999999');",
+                  "        pm.expect(draft.requested_term_months).to.eql(12);",
+                  "        pm.expect(draft.application_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    });",
+                  "    pm.collectionVariables.set('auto_app', draft.application_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requested_amount_minor\": \"4999999\",\n  \"requested_term_months\": 12\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Чужая заявка скрыта от другого клиента",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 404);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 404) {",
+                  "    const error = pm.response.json();",
+                  "    pm.test('404 без данных чужой заявки', () => {",
+                  "        pm.expect(error.code).to.eql('NOT_FOUND');",
+                  "        pm.expect(error).not.to.have.any.keys('application_id', 'status', 'requested_amount_minor');",
+                  "    });",
+                  "    pm.collectionVariables.set('foreign_error', JSON.stringify(error));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{manual_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{auto_app}}"
+          }
+        },
+        {
+          "name": "Чужая и отсутствующая заявки неразличимы",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 404);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 404) {",
+                  "    pm.test('Тело 404 совпадает', () => {",
+                  "        pm.expect(pm.response.json()).to.deep.eql(JSON.parse(pm.collectionVariables.get('foreign_error')));",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{manual_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{$guid}}"
+          }
+        },
+        {
+          "name": "Подать заявку",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 202);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    const receipt = pm.response.json();",
+                  "    pm.test('Принята подача этой заявки', () => {",
+                  "        pm.expect(receipt.application_id).to.eql(pm.collectionVariables.get('auto_app'));",
+                  "        pm.expect(receipt.accepted_status).to.eql('SCORING');",
+                  "        pm.expect(Date.parse(receipt.submitted_at)).to.be.finite;",
+                  "    });",
+                  "    pm.collectionVariables.set('submission_receipt', JSON.stringify(receipt));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{auto_app}}/submission"
+          }
+        },
+        {
+          "name": "Дождаться публикации ИУ",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);",
+                  "pm.variables.set('lf_poll', {\"field\": \"status\", \"target\": \"APPROVED\", \"pending\": [\"SCORING\", \"APPROVED\"], \"readyField\": \"offer_availability\", \"readyValue\": \"AVAILABLE\", \"idVar\": \"auto_app\"});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{auto_app}}"
+          }
+        },
+        {
+          "name": "Повтор подачи после одобрения",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 202);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    pm.test('Вернулось исходное подтверждение SCORING', () => {",
+                  "        pm.expect(pm.response.json()).to.deep.eql(JSON.parse(pm.collectionVariables.get('submission_receipt')));",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{auto_app}}/submission"
+          }
+        },
+        {
+          "name": "Проверить опубликованное предложение",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const offer = pm.response.json();",
+                  "    pm.test('Опубликованные ИУ соответствуют сценарию', () => {",
+                  "        pm.expect(offer.state).to.eql('AVAILABLE');",
+                  "        pm.expect(offer.terms_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "        pm.expect(offer.document_sha256).to.match(/^[0-9a-f]{64}$/);",
+                  "        pm.expect(offer.amount_minor).to.eql(\"4999999\");",
+                  "        pm.expect(offer.term_months).to.eql(12);",
+                  "        pm.expect(offer.cooling_hours).to.eql(0);",
+                  "        pm.expect(offer.withdrawal_available_during_cooling).to.eql(false);",
+                  "        pm.expect(offer).not.to.have.any.keys('pdn_percent', 'score');",
+                  "        pm.expect(offer.pdn_notice_required).to.eql(true);",
+                  "        pm.expect(offer.pdn_notice.version).to.be.a('string').and.not.empty;",
+                  "        pm.expect(offer.pdn_notice.text).to.be.a('string').and.not.empty;",
+                  "        pm.expect(offer.pdn_notice.shown_at).to.eql(null);",
+                  "    });",
+                  "    pm.collectionVariables.set('auto_terms', offer.terms_id);",
+                  "    pm.collectionVariables.set('auto_notice', offer.pdn_notice.version);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{auto_app}}/offer"
+          }
+        },
+        {
+          "name": "Получить PDF индивидуальных условий",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Ответ содержит PDF', () => {",
+                  "        pm.expect(pm.response.headers.get('Content-Type')).to.match(/^application\\/pdf(?:;|$)/i);",
+                  "        pm.expect(pm.response.text().slice(0, 5)).to.eql('%PDF-');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{auto_app}}/terms/{{auto_terms}}/document"
+          }
+        },
+        {
+          "name": "Начать подписание до показа предупреждения",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 409);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 409) {",
+                  "    pm.test('Код ошибки PDN_NOTICE_NOT_ACKNOWLEDGED', () => {",
+                  "        pm.expect(pm.response.json().code).to.eql('PDN_NOTICE_NOT_ACKNOWLEDGED');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{auto_app}}/signing-attempts"
+          }
+        },
+        {
+          "name": "Подтвердить показ предупреждения",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Версия и время показа зафиксированы', () => {",
+                  "        const ack = pm.response.json();",
+                  "        pm.expect(ack.notice_version).to.eql(pm.collectionVariables.get('auto_notice'));",
+                  "        pm.expect(Date.parse(ack.shown_at)).to.be.finite;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{auto_app}}/terms/{{auto_terms}}/pdn-notice-acknowledgement",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notice_version\": \"{{auto_notice}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Начать подписание",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 201);",
+                  "pm.collectionVariables.set('sign_key', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const attempt = pm.response.json();",
+                  "    pm.test('Попытка привязана к заявке', () => {",
+                  "        pm.expect(attempt.application_id).to.eql(pm.collectionVariables.get('auto_app'));",
+                  "        pm.expect(attempt.attempt_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    });",
+                  "    pm.collectionVariables.set('attempt_id', attempt.attempt_id);",
+                  "    pm.collectionVariables.set('attempt_receipt', JSON.stringify(attempt));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{sign_key}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{auto_app}}/signing-attempts"
+          }
+        },
+        {
+          "name": "Передать учебный SMS-код",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 202);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    pm.test('Принята проверка той же попытки', () => {",
+                  "        pm.expect(pm.response.json().attempt_id).to.eql(pm.collectionVariables.get('attempt_id'));",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{auto_app}}/signing-attempts/{{attempt_id}}/verification",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{sms_code}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Дождаться подписания",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);",
+                  "pm.variables.set('lf_poll', {\"field\": \"state\", \"target\": \"SIGNED\", \"pending\": [\"VERIFYING\"], \"idField\": \"attempt_id\", \"idVar\": \"attempt_id\"});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const attempt = pm.response.json();",
+                  "    if (attempt.state === 'SIGNED') {",
+                  "        pm.test('Создан договор', () => {",
+                  "            pm.expect(attempt.contract_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "        });",
+                  "        pm.collectionVariables.set('contract_id', attempt.contract_id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{auto_app}}/signing-attempts/{{attempt_id}}"
+          }
+        },
+        {
+          "name": "Повтор начала подписания с тем же ключом",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 201);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.test('Вернулась исходная попытка после подписания', () => {",
+                  "        pm.expect(pm.response.json()).to.deep.eql(JSON.parse(pm.collectionVariables.get('attempt_receipt')));",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{sign_key}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{auto_app}}/signing-attempts"
+          }
+        },
+        {
+          "name": "Заявка связана с подписанным договором",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('CONTRACT_SIGNED с тем же contract_id', () => {",
+                  "        const card = pm.response.json();",
+                  "        pm.expect(card.status).to.eql('CONTRACT_SIGNED');",
+                  "        pm.expect(card.contract_id).to.eql(pm.collectionVariables.get('contract_id'));",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{auto_app}}"
+          }
+        },
+        {
+          "name": "Дождаться подтверждённой выдачи",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);",
+                  "pm.variables.set('lf_poll', {\"field\": \"status\", \"target\": \"DISBURSED\", \"pending\": [\"DISBURSEMENT_PROCESSING\"], \"idField\": \"contract_id\", \"idVar\": \"contract_id\"});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const contract = pm.response.json();",
+                  "    if (contract.status === 'DISBURSED') {",
+                  "        pm.test('Договор выдан без охлаждения', () => {",
+                  "            pm.expect(contract.application_id).to.eql(pm.collectionVariables.get('auto_app'));",
+                  "            pm.expect(contract.cooling_ends_at).to.eql(null);",
+                  "            pm.expect(contract.can_withdraw).to.eql(false);",
+                  "            pm.expect(Date.parse(contract.posted_at)).to.be.finite;",
+                  "        });",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mobile_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/contracts/{{contract_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 · Ручное рассмотрение",
+      "description": "FR-UC04-01 и FR-UC05-01. Срок 37 месяцев и синтетический профиль переводят заявку в очередь. Одобрение андеррайтера публикует ИУ.",
+      "item": [
+        {
+          "name": "Создать черновик",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 201);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const draft = pm.response.json();",
+                  "    pm.test('Создан DRAFT с заданными параметрами', () => {",
+                  "        pm.expect(draft.status).to.eql('DRAFT');",
+                  "        pm.expect(draft.requested_amount_minor).to.eql('5000000');",
+                  "        pm.expect(draft.requested_term_months).to.eql(37);",
+                  "        pm.expect(draft.application_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    });",
+                  "    pm.collectionVariables.set('manual_app', draft.application_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{manual_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requested_amount_minor\": \"5000000\",\n  \"requested_term_months\": 37\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Подать заявку",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 202);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    const receipt = pm.response.json();",
+                  "    pm.test('Принята подача этой заявки', () => {",
+                  "        pm.expect(receipt.application_id).to.eql(pm.collectionVariables.get('manual_app'));",
+                  "        pm.expect(receipt.accepted_status).to.eql('SCORING');",
+                  "        pm.expect(Date.parse(receipt.submitted_at)).to.be.finite;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{manual_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{manual_app}}/submission"
+          }
+        },
+        {
+          "name": "Дождаться UNDERWRITING",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);",
+                  "pm.variables.set('lf_poll', {\"field\": \"status\", \"target\": \"UNDERWRITING\", \"pending\": [\"SCORING\"], \"idVar\": \"manual_app\"});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{manual_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{manual_app}}"
+          }
+        },
+        {
+          "name": "Найти заявку в очереди",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Андеррайтер видит заявку', () => {",
+                  "        pm.expect(pm.response.json().some(card => card.application_id === pm.collectionVariables.get('manual_app') && card.status === 'UNDERWRITING')).to.eql(true);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{underwriter_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/underwriting/applications"
+          }
+        },
+        {
+          "name": "Открыть карточку андеррайтера",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Карточка соответствует заявке и содержит дедлайн', () => {",
+                  "        const card = pm.response.json();",
+                  "        pm.expect(card.application_id).to.eql(pm.collectionVariables.get('manual_app'));",
+                  "        pm.expect(card.status).to.eql('UNDERWRITING');",
+                  "        pm.expect(card.requested_term_months).to.eql(37);",
+                  "        pm.expect(Date.parse(card.sla_deadline_at)).to.be.finite;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{underwriter_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/underwriting/applications/{{manual_app}}"
+          }
+        },
+        {
+          "name": "Одобрить заявку",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);",
+                  "pm.collectionVariables.set('decision_key', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const decision = pm.response.json();",
+                  "    pm.test('Получено финальное одобрение', () => {",
+                  "        pm.expect(decision.application_id).to.eql(pm.collectionVariables.get('manual_app'));",
+                  "        pm.expect(decision.command).to.eql('APPROVE');",
+                  "        pm.expect(decision.decision).to.eql('APPROVED');",
+                  "        pm.expect(decision.application_status).to.eql('APPROVED');",
+                  "    });",
+                  "    pm.collectionVariables.set('decision_receipt', JSON.stringify(decision));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{decision_key}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{underwriter_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/underwriting/applications/{{manual_app}}/decision",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"command\": \"APPROVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Повторить ручное решение с тем же ключом",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Тело принятого решения сохранилось', () => {",
+                  "        pm.expect(pm.response.json()).to.deep.eql(JSON.parse(pm.collectionVariables.get('decision_receipt')));",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{decision_key}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{underwriter_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/underwriting/applications/{{manual_app}}/decision",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"command\": \"APPROVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Дождаться публикации ИУ",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);",
+                  "pm.variables.set('lf_poll', {\"field\": \"status\", \"target\": \"APPROVED\", \"pending\": [\"SCORING\", \"APPROVED\"], \"readyField\": \"offer_availability\", \"readyValue\": \"AVAILABLE\", \"idVar\": \"manual_app\"});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{manual_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{manual_app}}"
+          }
+        },
+        {
+          "name": "Проверить опубликованное предложение",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const offer = pm.response.json();",
+                  "    pm.test('Опубликованные ИУ соответствуют сценарию', () => {",
+                  "        pm.expect(offer.state).to.eql('AVAILABLE');",
+                  "        pm.expect(offer.terms_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "        pm.expect(offer.document_sha256).to.match(/^[0-9a-f]{64}$/);",
+                  "        pm.expect(offer.amount_minor).to.eql(\"5000000\");",
+                  "        pm.expect(offer.term_months).to.eql(37);",
+                  "        pm.expect(offer.cooling_hours).to.eql(4);",
+                  "        pm.expect(offer).not.to.have.any.keys('pdn_percent', 'score');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{manual_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{manual_app}}/offer"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 · Бизнес-отказ",
+      "description": "3.3 и FR-UC03-02. Доход null, поле текущих платежей есть.",
+      "item": [
+        {
+          "name": "Создать черновик",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 201);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const draft = pm.response.json();",
+                  "    pm.test('Создан DRAFT с заданными параметрами', () => {",
+                  "        pm.expect(draft.status).to.eql('DRAFT');",
+                  "        pm.expect(draft.requested_amount_minor).to.eql('5000000');",
+                  "        pm.expect(draft.requested_term_months).to.eql(12);",
+                  "        pm.expect(draft.application_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    });",
+                  "    pm.collectionVariables.set('refusal_app', draft.application_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{refusal_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requested_amount_minor\": \"5000000\",\n  \"requested_term_months\": 12\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Подать заявку",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 202);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    const receipt = pm.response.json();",
+                  "    pm.test('Принята подача этой заявки', () => {",
+                  "        pm.expect(receipt.application_id).to.eql(pm.collectionVariables.get('refusal_app'));",
+                  "        pm.expect(receipt.accepted_status).to.eql('SCORING');",
+                  "        pm.expect(Date.parse(receipt.submitted_at)).to.be.finite;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{refusal_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{refusal_app}}/submission"
+          }
+        },
+        {
+          "name": "Дождаться BANK_REJECTED",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);",
+                  "pm.variables.set('lf_poll', {\"field\": \"status\", \"target\": \"BANK_REJECTED\", \"pending\": [\"SCORING\"], \"idVar\": \"refusal_app\"});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const card = pm.response.json();",
+                  "    if (card.status === 'BANK_REJECTED') {",
+                  "        pm.test('Клиентский исход оценки и отсутствие ИУ', () => {",
+                  "            pm.expect(card.display_reason).to.eql(\"REFUSED\");",
+                  "            pm.expect(card.offer_availability).to.eql('NONE');",
+                  "            pm.expect(card).not.to.have.any.keys('rejection_reason_code', 'pdn_percent', 'score');",
+                  "        });",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{refusal_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{refusal_app}}"
+          }
+        },
+        {
+          "name": "Предложение недоступно",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 409);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 409) {",
+                  "    pm.test('Код ошибки OFFER_NOT_AVAILABLE', () => {",
+                  "        pm.expect(pm.response.json().code).to.eql('OFFER_NOT_AVAILABLE');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{refusal_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{refusal_app}}/offer"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 · Техническая ошибка оценки",
+      "description": "3.3 и FR-UC03-03. Доход null, обязательное поле текущих платежей отсутствует.",
+      "item": [
+        {
+          "name": "Создать черновик",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 201);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const draft = pm.response.json();",
+                  "    pm.test('Создан DRAFT с заданными параметрами', () => {",
+                  "        pm.expect(draft.status).to.eql('DRAFT');",
+                  "        pm.expect(draft.requested_amount_minor).to.eql('5000000');",
+                  "        pm.expect(draft.requested_term_months).to.eql(12);",
+                  "        pm.expect(draft.application_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    });",
+                  "    pm.collectionVariables.set('error_app', draft.application_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{error_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requested_amount_minor\": \"5000000\",\n  \"requested_term_months\": 12\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Подать заявку",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 202);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    const receipt = pm.response.json();",
+                  "    pm.test('Принята подача этой заявки', () => {",
+                  "        pm.expect(receipt.application_id).to.eql(pm.collectionVariables.get('error_app'));",
+                  "        pm.expect(receipt.accepted_status).to.eql('SCORING');",
+                  "        pm.expect(Date.parse(receipt.submitted_at)).to.be.finite;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{error_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{error_app}}/submission"
+          }
+        },
+        {
+          "name": "Дождаться SYSTEM_ERROR",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);",
+                  "pm.variables.set('lf_poll', {\"field\": \"status\", \"target\": \"SYSTEM_ERROR\", \"pending\": [\"SCORING\"], \"idVar\": \"error_app\"});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const card = pm.response.json();",
+                  "    if (card.status === 'SYSTEM_ERROR') {",
+                  "        pm.test('Клиентский исход оценки и отсутствие ИУ', () => {",
+                  "            pm.expect(card.display_reason).to.eql(null);",
+                  "            pm.expect(card.offer_availability).to.eql('NONE');",
+                  "            pm.expect(card).not.to.have.any.keys('rejection_reason_code', 'pdn_percent', 'score');",
+                  "        });",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{error_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{error_app}}"
+          }
+        },
+        {
+          "name": "Предложение недоступно",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 409);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 409) {",
+                  "    pm.test('Код ошибки OFFER_NOT_AVAILABLE', () => {",
+                  "        pm.expect(pm.response.json().code).to.eql('OFFER_NOT_AVAILABLE');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{error_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{error_app}}/offer"
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 · ПДН 50%",
+      "description": "3.3 и FR-UC05-02. 50 000 ₽ на 12 месяцев под 20%, доход 100 000 ₽. Платёж в предложении регулярный.",
+      "item": [
+        {
+          "name": "Создать черновик",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 201);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const draft = pm.response.json();",
+                  "    pm.test('Создан DRAFT с заданными параметрами', () => {",
+                  "        pm.expect(draft.status).to.eql('DRAFT');",
+                  "        pm.expect(draft.requested_amount_minor).to.eql('5000000');",
+                  "        pm.expect(draft.requested_term_months).to.eql(12);",
+                  "        pm.expect(draft.application_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    });",
+                  "    pm.collectionVariables.set('pdn_at_app', draft.application_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{pdn_at_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requested_amount_minor\": \"5000000\",\n  \"requested_term_months\": 12\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Подать заявку",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 202);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    const receipt = pm.response.json();",
+                  "    pm.test('Принята подача этой заявки', () => {",
+                  "        pm.expect(receipt.application_id).to.eql(pm.collectionVariables.get('pdn_at_app'));",
+                  "        pm.expect(receipt.accepted_status).to.eql('SCORING');",
+                  "        pm.expect(Date.parse(receipt.submitted_at)).to.be.finite;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{pdn_at_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{pdn_at_app}}/submission"
+          }
+        },
+        {
+          "name": "Дождаться публикации ИУ",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);",
+                  "pm.variables.set('lf_poll', {\"field\": \"status\", \"target\": \"APPROVED\", \"pending\": [\"SCORING\", \"APPROVED\"], \"readyField\": \"offer_availability\", \"readyValue\": \"AVAILABLE\", \"idVar\": \"pdn_at_app\"});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{pdn_at_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{pdn_at_app}}"
+          }
+        },
+        {
+          "name": "Проверить опубликованное предложение",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const offer = pm.response.json();",
+                  "    pm.test('Опубликованные ИУ соответствуют сценарию', () => {",
+                  "        pm.expect(offer.state).to.eql('AVAILABLE');",
+                  "        pm.expect(offer.terms_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "        pm.expect(offer.document_sha256).to.match(/^[0-9a-f]{64}$/);",
+                  "        pm.expect(offer.monthly_payment_minor).to.eql(\"463173\");",
+                  "        pm.expect(offer.psk_annual_percent).to.eql(\"20.000006146107\");",
+                  "        pm.expect(offer.psk_rub).to.eql(\"5580.70\");",
+                  "        pm.expect(offer.cooling_hours).to.eql(4);",
+                  "        pm.expect(offer).not.to.have.any.keys('pdn_percent', 'score');",
+                  "        pm.expect(offer.pdn_notice_required).to.eql(false);",
+                  "        pm.expect(offer).not.to.have.property('pdn_notice');",
+                  "    });",
+                  "    pm.collectionVariables.set('pdn_at_terms', offer.terms_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{pdn_at_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{pdn_at_app}}/offer"
+          }
+        },
+        {
+          "name": "Проверить доступность подписания",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Действие подписания соответствует порогу ПДН', () => {",
+                  "        pm.expect(pm.response.json().available_actions.includes('START_SIGNING')).to.eql(true);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{pdn_at_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{pdn_at_app}}"
+          }
+        },
+        {
+          "name": "Получить PDF индивидуальных условий",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Ответ содержит PDF', () => {",
+                  "        pm.expect(pm.response.headers.get('Content-Type')).to.match(/^application\\/pdf(?:;|$)/i);",
+                  "        pm.expect(pm.response.text().slice(0, 5)).to.eql('%PDF-');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{pdn_at_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{pdn_at_app}}/terms/{{pdn_at_terms}}/document"
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 · ПДН 50,01%",
+      "description": "3.3 и FR-UC05-02. 50 000 ₽ на 12 месяцев под 20%, доход 100 000 ₽. Платёж в предложении регулярный.",
+      "item": [
+        {
+          "name": "Создать черновик",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 201);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const draft = pm.response.json();",
+                  "    pm.test('Создан DRAFT с заданными параметрами', () => {",
+                  "        pm.expect(draft.status).to.eql('DRAFT');",
+                  "        pm.expect(draft.requested_amount_minor).to.eql('5000000');",
+                  "        pm.expect(draft.requested_term_months).to.eql(12);",
+                  "        pm.expect(draft.application_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    });",
+                  "    pm.collectionVariables.set('pdn_over_app', draft.application_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{pdn_over_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requested_amount_minor\": \"5000000\",\n  \"requested_term_months\": 12\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Подать заявку",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 202);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    const receipt = pm.response.json();",
+                  "    pm.test('Принята подача этой заявки', () => {",
+                  "        pm.expect(receipt.application_id).to.eql(pm.collectionVariables.get('pdn_over_app'));",
+                  "        pm.expect(receipt.accepted_status).to.eql('SCORING');",
+                  "        pm.expect(Date.parse(receipt.submitted_at)).to.be.finite;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{pdn_over_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{pdn_over_app}}/submission"
+          }
+        },
+        {
+          "name": "Дождаться публикации ИУ",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);",
+                  "pm.variables.set('lf_poll', {\"field\": \"status\", \"target\": \"APPROVED\", \"pending\": [\"SCORING\", \"APPROVED\"], \"readyField\": \"offer_availability\", \"readyValue\": \"AVAILABLE\", \"idVar\": \"pdn_over_app\"});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{pdn_over_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{pdn_over_app}}"
+          }
+        },
+        {
+          "name": "Проверить опубликованное предложение",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const offer = pm.response.json();",
+                  "    pm.test('Опубликованные ИУ соответствуют сценарию', () => {",
+                  "        pm.expect(offer.state).to.eql('AVAILABLE');",
+                  "        pm.expect(offer.terms_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "        pm.expect(offer.document_sha256).to.match(/^[0-9a-f]{64}$/);",
+                  "        pm.expect(offer.monthly_payment_minor).to.eql(\"463173\");",
+                  "        pm.expect(offer.psk_annual_percent).to.eql(\"20.000006146107\");",
+                  "        pm.expect(offer.psk_rub).to.eql(\"5580.70\");",
+                  "        pm.expect(offer.cooling_hours).to.eql(4);",
+                  "        pm.expect(offer).not.to.have.any.keys('pdn_percent', 'score');",
+                  "        pm.expect(offer.pdn_notice_required).to.eql(true);",
+                  "        pm.expect(offer.pdn_notice.version).to.be.a('string').and.not.empty;",
+                  "        pm.expect(offer.pdn_notice.text).to.be.a('string').and.not.empty;",
+                  "        pm.expect(offer.pdn_notice.shown_at).to.eql(null);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{pdn_over_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{pdn_over_app}}/offer"
+          }
+        },
+        {
+          "name": "Проверить доступность подписания",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Действие подписания соответствует порогу ПДН', () => {",
+                  "        pm.expect(pm.response.json().available_actions.includes('START_SIGNING')).to.eql(false);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{pdn_over_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{pdn_over_app}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 · ПСК ниже 25%",
+      "description": "3.3 и FR-UC05-01. Тестовый поток 120 000 коп. на месяц с одним платежом 122499 коп. Нужен тестовый воркер.",
+      "item": [
+        {
+          "name": "Создать черновик",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 201);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const draft = pm.response.json();",
+                  "    pm.test('Создан DRAFT с заданными параметрами', () => {",
+                  "        pm.expect(draft.status).to.eql('DRAFT');",
+                  "        pm.expect(draft.requested_amount_minor).to.eql('120000');",
+                  "        pm.expect(draft.requested_term_months).to.eql(1);",
+                  "        pm.expect(draft.application_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    });",
+                  "    pm.collectionVariables.set('psk_below_app', draft.application_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{psk_below_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requested_amount_minor\": \"120000\",\n  \"requested_term_months\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Подать заявку",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 202);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    const receipt = pm.response.json();",
+                  "    pm.test('Принята подача этой заявки', () => {",
+                  "        pm.expect(receipt.application_id).to.eql(pm.collectionVariables.get('psk_below_app'));",
+                  "        pm.expect(receipt.accepted_status).to.eql('SCORING');",
+                  "        pm.expect(Date.parse(receipt.submitted_at)).to.be.finite;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{psk_below_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{psk_below_app}}/submission"
+          }
+        },
+        {
+          "name": "Дождаться публикации ИУ",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);",
+                  "pm.variables.set('lf_poll', {\"field\": \"status\", \"target\": \"APPROVED\", \"pending\": [\"SCORING\", \"APPROVED\"], \"readyField\": \"offer_availability\", \"readyValue\": \"AVAILABLE\", \"idVar\": \"psk_below_app\"});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{psk_below_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{psk_below_app}}"
+          }
+        },
+        {
+          "name": "Проверить опубликованное предложение",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const offer = pm.response.json();",
+                  "    pm.test('Опубликованные ИУ соответствуют сценарию', () => {",
+                  "        pm.expect(offer.state).to.eql('AVAILABLE');",
+                  "        pm.expect(offer.terms_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "        pm.expect(offer.document_sha256).to.match(/^[0-9a-f]{64}$/);",
+                  "        pm.expect(offer.monthly_payment_minor).to.eql(\"122499\");",
+                  "        pm.expect(offer.psk_annual_percent).to.eql(\"24.990000000000\");",
+                  "        pm.expect(offer.psk_rub).to.eql(\"24.99\");",
+                  "        pm.expect(offer).not.to.have.any.keys('pdn_percent', 'score');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{psk_below_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{psk_below_app}}/offer"
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 · ПСК ровно 25%",
+      "description": "3.3 и FR-UC05-01. Тестовый поток 120 000 коп. на месяц с одним платежом 122500 коп. Нужен тестовый воркер.",
+      "item": [
+        {
+          "name": "Создать черновик",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 201);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const draft = pm.response.json();",
+                  "    pm.test('Создан DRAFT с заданными параметрами', () => {",
+                  "        pm.expect(draft.status).to.eql('DRAFT');",
+                  "        pm.expect(draft.requested_amount_minor).to.eql('120000');",
+                  "        pm.expect(draft.requested_term_months).to.eql(1);",
+                  "        pm.expect(draft.application_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    });",
+                  "    pm.collectionVariables.set('psk_at_app', draft.application_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{psk_at_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requested_amount_minor\": \"120000\",\n  \"requested_term_months\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Подать заявку",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 202);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    const receipt = pm.response.json();",
+                  "    pm.test('Принята подача этой заявки', () => {",
+                  "        pm.expect(receipt.application_id).to.eql(pm.collectionVariables.get('psk_at_app'));",
+                  "        pm.expect(receipt.accepted_status).to.eql('SCORING');",
+                  "        pm.expect(Date.parse(receipt.submitted_at)).to.be.finite;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{psk_at_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{psk_at_app}}/submission"
+          }
+        },
+        {
+          "name": "Дождаться публикации ИУ",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);",
+                  "pm.variables.set('lf_poll', {\"field\": \"status\", \"target\": \"APPROVED\", \"pending\": [\"SCORING\", \"APPROVED\"], \"readyField\": \"offer_availability\", \"readyValue\": \"AVAILABLE\", \"idVar\": \"psk_at_app\"});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{psk_at_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{psk_at_app}}"
+          }
+        },
+        {
+          "name": "Проверить опубликованное предложение",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const offer = pm.response.json();",
+                  "    pm.test('Опубликованные ИУ соответствуют сценарию', () => {",
+                  "        pm.expect(offer.state).to.eql('AVAILABLE');",
+                  "        pm.expect(offer.terms_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "        pm.expect(offer.document_sha256).to.match(/^[0-9a-f]{64}$/);",
+                  "        pm.expect(offer.monthly_payment_minor).to.eql(\"122500\");",
+                  "        pm.expect(offer.psk_annual_percent).to.eql(\"25.000000000000\");",
+                  "        pm.expect(offer.psk_rub).to.eql(\"25.00\");",
+                  "        pm.expect(offer).not.to.have.any.keys('pdn_percent', 'score');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{psk_at_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{psk_at_app}}/offer"
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 · ПСК выше 25%",
+      "description": "3.3 и FR-UC05-01. Тестовый поток 120 000 коп. на месяц с одним платежом 122501 коп. Нужен тестовый воркер.",
+      "item": [
+        {
+          "name": "Создать черновик",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 201);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const draft = pm.response.json();",
+                  "    pm.test('Создан DRAFT с заданными параметрами', () => {",
+                  "        pm.expect(draft.status).to.eql('DRAFT');",
+                  "        pm.expect(draft.requested_amount_minor).to.eql('120000');",
+                  "        pm.expect(draft.requested_term_months).to.eql(1);",
+                  "        pm.expect(draft.application_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    });",
+                  "    pm.collectionVariables.set('psk_above_app', draft.application_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{psk_above_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requested_amount_minor\": \"120000\",\n  \"requested_term_months\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Подать заявку",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 202);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    const receipt = pm.response.json();",
+                  "    pm.test('Принята подача этой заявки', () => {",
+                  "        pm.expect(receipt.application_id).to.eql(pm.collectionVariables.get('psk_above_app'));",
+                  "        pm.expect(receipt.accepted_status).to.eql('SCORING');",
+                  "        pm.expect(Date.parse(receipt.submitted_at)).to.be.finite;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{psk_above_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{psk_above_app}}/submission"
+          }
+        },
+        {
+          "name": "Дождаться BANK_REJECTED",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);",
+                  "pm.variables.set('lf_poll', {\"field\": \"status\", \"target\": \"BANK_REJECTED\", \"pending\": [\"SCORING\"], \"idVar\": \"psk_above_app\"});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const card = pm.response.json();",
+                  "    if (card.status === 'BANK_REJECTED') {",
+                  "        pm.test('Клиентский исход оценки и отсутствие ИУ', () => {",
+                  "            pm.expect(card.display_reason).to.eql(\"REFUSED\");",
+                  "            pm.expect(card.offer_availability).to.eql('NONE');",
+                  "            pm.expect(card).not.to.have.any.keys('rejection_reason_code', 'pdn_percent', 'score');",
+                  "        });",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{psk_above_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{psk_above_app}}"
+          }
+        },
+        {
+          "name": "Предложение недоступно",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 409);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 409) {",
+                  "    pm.test('Код ошибки OFFER_NOT_AVAILABLE', () => {",
+                  "        pm.expect(pm.response.json().code).to.eql('OFFER_NOT_AVAILABLE');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{psk_above_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{psk_above_app}}/offer"
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 · Округление ПСК в PDF",
+      "description": "3.3. Штатный график на 1 600 ₽ и 1 месяц. ПСК в JSON равна 20.002500000000, в PDF ожидается 20.003%. Newman-обёртка проверяет текст через pdftotext.",
+      "item": [
+        {
+          "name": "Создать черновик",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 201);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const draft = pm.response.json();",
+                  "    pm.test('Создан DRAFT с заданными параметрами', () => {",
+                  "        pm.expect(draft.status).to.eql('DRAFT');",
+                  "        pm.expect(draft.requested_amount_minor).to.eql('160000');",
+                  "        pm.expect(draft.requested_term_months).to.eql(1);",
+                  "        pm.expect(draft.application_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "    });",
+                  "    pm.collectionVariables.set('pdf_app', draft.application_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{pdf_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requested_amount_minor\": \"160000\",\n  \"requested_term_months\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Подать заявку",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 202);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    const receipt = pm.response.json();",
+                  "    pm.test('Принята подача этой заявки', () => {",
+                  "        pm.expect(receipt.application_id).to.eql(pm.collectionVariables.get('pdf_app'));",
+                  "        pm.expect(receipt.accepted_status).to.eql('SCORING');",
+                  "        pm.expect(Date.parse(receipt.submitted_at)).to.be.finite;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{pdf_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{pdf_app}}/submission"
+          }
+        },
+        {
+          "name": "Дождаться публикации ИУ",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);",
+                  "pm.variables.set('lf_poll', {\"field\": \"status\", \"target\": \"APPROVED\", \"pending\": [\"SCORING\", \"APPROVED\"], \"readyField\": \"offer_availability\", \"readyValue\": \"AVAILABLE\", \"idVar\": \"pdf_app\"});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{pdf_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{pdf_app}}"
+          }
+        },
+        {
+          "name": "Проверить опубликованное предложение",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const offer = pm.response.json();",
+                  "    pm.test('Опубликованные ИУ соответствуют сценарию', () => {",
+                  "        pm.expect(offer.state).to.eql('AVAILABLE');",
+                  "        pm.expect(offer.terms_id).to.match(/^[0-9a-f-]{36}$/i);",
+                  "        pm.expect(offer.document_sha256).to.match(/^[0-9a-f]{64}$/);",
+                  "        pm.expect(offer.monthly_payment_minor).to.eql(\"162667\");",
+                  "        pm.expect(offer.psk_annual_percent).to.eql(\"20.002500000000\");",
+                  "        pm.expect(offer.psk_rub).to.eql(\"26.67\");",
+                  "        pm.expect(offer).not.to.have.any.keys('pdn_percent', 'score');",
+                  "    });",
+                  "    pm.collectionVariables.set('pdf_terms', offer.terms_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{pdf_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{pdf_app}}/offer"
+          }
+        },
+        {
+          "name": "Получить PDF индивидуальных условий",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('lf_http', 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Ответ содержит PDF', () => {",
+                  "        pm.expect(pm.response.headers.get('Content-Type')).to.match(/^application\\/pdf(?:;|$)/i);",
+                  "        pm.expect(pm.response.text().slice(0, 5)).to.eql('%PDF-');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{pdf_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{base_url}}/applications/{{pdf_app}}/terms/{{pdf_terms}}/document"
+          }
+        }
+      ]
+    }
+  ]
+}
