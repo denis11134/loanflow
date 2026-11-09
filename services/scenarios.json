@@ -1,0 +1,31 @@
+{
+  "customers": {
+    "mobile": {
+      "customer_id": "10000000-0000-0000-0000-000000000001",
+      "account_ref": "stand-account-1",
+      "profile_ref": "stand-profile-1",
+      "scenario": {
+        "consent_ref": "stand-consent-1",
+        "credit_report_ref": "stand-report-1",
+        "payroll_income_rub": "55000.00",
+        "existing_payments_rub": "25000.00",
+        "requested_payment_rub": "5000.00",
+        "de_result": "APPROVED",
+        "offer": {
+          "amount_rub": "50000.00", "term_months": 12, "annual_rate_percent": "20",
+          "monthly_payment_rub": "5000.00", "psk_annual_percent": "23.8",
+          "psk_rub": "10000.00", "psk_limit": "25", "quota_period": "demo", "quota_bucket": "standard"
+        }
+      }
+    }
+  },
+  "actors": {
+    "mobile": {"role": "CUSTOMER", "customer": "mobile"},
+    "contact": {"role": "CONTACT_CENTER", "identified_customer": "mobile"},
+    "branch": {"role": "BRANCH"},
+    "underwriter": {"role": "UNDERWRITER"},
+    "supervisor": {"role": "UNDERWRITING_SUPERVISOR"},
+    "reconciliation": {"role": "RECONCILIATION_OPERATOR"}
+  },
+  "quotas": [{"period": "demo", "bucket": "standard", "capacity": 10}]
+}
