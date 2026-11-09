@@ -1,0 +1,2406 @@
+openapi: 3.0.3
+info:
+  title: LoanFlow · API учебного MVP
+  version: 1.0.0
+  description: API мобильного приложения и рабочих мест. Роль, личность и контекст определяются доверенным токеном. Политика
+    повторов и связь с внутренними операциями описаны в главе 2.3.
+security:
+- StandBearer: []
+paths:
+  /applications:
+    post:
+      operationId: createDraft
+      tags:
+      - CUSTOMER
+      summary: Создать черновик
+      description: Сумма и срок необязательны. Повтор с тем же ключом возвращает первый результат и тот же идентификатор.
+      x-roles:
+      - CUSTOMER
+      x-requirements:
+      - FR-UC02-01
+      - FR-UC06-01
+      parameters:
+      - $ref: '#/components/parameters/idempotency_key'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DraftInput'
+      responses:
+        '201':
+          description: Черновик создан.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationView'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '503':
+          $ref: '#/components/responses/Http503'
+        '409':
+          description: Команда недоступна или ключ уже использован для другого тела.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - IDEMPOTENCY_KEY_REUSED
+    get:
+      operationId: listOwnApplications
+      tags:
+      - CUSTOMER
+      summary: Список своих заявок
+      description: Выборка привязана к клиенту из токена.
+      x-roles:
+      - CUSTOMER
+      x-requirements:
+      - FR-UC06-01
+      responses:
+        '200':
+          description: Собственные заявки.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApplicationView'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '503':
+          $ref: '#/components/responses/Http503'
+  /applications/{application_id}:
+    get:
+      operationId: getOwnApplication
+      tags:
+      - CUSTOMER
+      summary: Прочитать текущую заявку
+      description: Текущий статус и допустимые действия. Подготовка ИУ отличается от их доступности. Код причины банка и балл
+        скоринга не возвращаются.
+      x-roles:
+      - CUSTOMER
+      x-requirements:
+      - FR-UC06-01
+      - FR-UC03-01
+      - FR-UC03-02
+      - FR-UC03-03
+      - FR-UC05-03
+      parameters:
+      - $ref: '#/components/parameters/application_id'
+      responses:
+        '200':
+          description: Операция выполнена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationView'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+    patch:
+      operationId: updateDraft
+      tags:
+      - CUSTOMER
+      summary: Обновить черновик
+      description: Редактирование только в DRAFT. Пропущенные поля сохраняются. null очищает переданное поле.
+      x-roles:
+      - CUSTOMER
+      x-requirements:
+      - FR-UC02-01
+      - FR-UC06-01
+      parameters:
+      - $ref: '#/components/parameters/application_id'
+      - $ref: '#/components/parameters/idempotency_key'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DraftPatch'
+      responses:
+        '200':
+          description: Операция выполнена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationView'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+        '409':
+          description: Команда недоступна или ключ уже использован для другого тела.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - DRAFT_REQUIRED
+                      - IDEMPOTENCY_KEY_REUSED
+  /applications/{application_id}/submission:
+    post:
+      operationId: submitApplication
+      tags:
+      - CUSTOMER
+      summary: Подать заявку
+      description: У принятой подачи повтор всегда возвращает исходные идентификатор, время и SCORING, даже после смены статуса.
+        Текущий статус читается отдельно. Конкурирующая подача по клиенту проверяется после сериализации.
+      x-roles:
+      - CUSTOMER
+      x-requirements:
+      - FR-UC02-01
+      - FR-UC02-02
+      parameters:
+      - $ref: '#/components/parameters/application_id'
+      responses:
+        '202':
+          description: Подача принята. Оценка запущена один раз.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionReceipt'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+        '409':
+          description: Команда недоступна в текущем состоянии.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - APPLICATION_STATE_CONFLICT
+                      - BLOCKING_APPLICATION_OR_CONTRACT
+        '422':
+          description: Запрос корректен по формату, но нарушает условия сценария.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - REQUIRED_FIELDS_MISSING
+                      - CUSTOMER_NOT_ELIGIBLE
+  /applications/{application_id}/cancellation:
+    post:
+      operationId: cancelApplication
+      tags:
+      - CUSTOMER
+      summary: Отменить заявку
+      description: Первый допустимый переход освобождает имеющийся резерв. Повтор для CLIENT_CANCELED возвращает тот же итог.
+      x-roles:
+      - CUSTOMER
+      x-requirements:
+      - FR-UC02-03
+      - FR-UC04-01
+      - FR-UC01-05
+      parameters:
+      - $ref: '#/components/parameters/application_id'
+      responses:
+        '200':
+          description: Операция выполнена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationCancellation'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+        '409':
+          description: Команда недоступна в текущем состоянии.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - APPLICATION_CANCELLATION_UNAVAILABLE
+  /applications/{application_id}/offer:
+    get:
+      operationId: getOffer
+      tags:
+      - CUSTOMER
+      summary: Прочитать предложение и сведения об ИУ
+      description: До публикации видна подготовка ИУ. Событие публикации фиксирует первый момент предоставления и дедлайн.
+        Чтение их не меняет. При обязательном предупреждении о ПДН присутствует pdn_notice.
+      x-roles:
+      - CUSTOMER
+      x-requirements:
+      - FR-UC05-01
+      - FR-UC05-02
+      - FR-UC05-03
+      parameters:
+      - $ref: '#/components/parameters/application_id'
+      responses:
+        '200':
+          description: Подготовка либо сведения о предоставленных ИУ.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/OfferPreparing'
+                - $ref: '#/components/schemas/TermsAvailable'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+        '409':
+          description: Команда недоступна в текущем состоянии.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - OFFER_NOT_AVAILABLE
+  /applications/{application_id}/terms/{terms_id}/document:
+    get:
+      operationId: getIndividualTermsDocument
+      tags:
+      - CUSTOMER
+      summary: Получить экземпляр ИУ
+      description: Возвращает точные неизменяемые байты опубликованного PDF для данного terms_id.
+      x-roles:
+      - CUSTOMER
+      x-requirements:
+      - FR-UC05-02
+      - FR-UC05-03
+      parameters:
+      - $ref: '#/components/parameters/application_id'
+      - $ref: '#/components/parameters/terms_id'
+      responses:
+        '200':
+          description: Предоставленный экземпляр ИУ.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+  /applications/{application_id}/terms/{terms_id}/pdn-notice-acknowledgement:
+    put:
+      operationId: acknowledgePdnNotice
+      tags:
+      - CUSTOMER
+      summary: Подтвердить показ предупреждения
+      description: Доверенное МП вызывает операцию после фактического показа текста. Сервер фиксирует первый момент показа
+        для экземпляра ИУ и актуальной версии. Повтор возвращает исходный момент.
+      x-roles:
+      - CUSTOMER
+      x-requirements:
+      - FR-UC05-02
+      parameters:
+      - $ref: '#/components/parameters/application_id'
+      - $ref: '#/components/parameters/terms_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                notice_version:
+                  type: string
+                  minLength: 1
+              required:
+              - notice_version
+      responses:
+        '200':
+          description: Операция выполнена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoticeAcknowledgement'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+        '409':
+          description: Команда недоступна в текущем состоянии.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - PDN_NOTICE_NOT_REQUIRED
+                      - NOTICE_VERSION_MISMATCH
+                      - OFFER_EXPIRED
+  /applications/{application_id}/signing-attempts:
+    post:
+      operationId: startSigningAttempt
+      tags:
+      - CUSTOMER
+      summary: Начать подписание
+      description: Успех открывает одну попытку и инициирует первое SMS. Проверяется действующий дедлайн и, при необходимости,
+        показ предупреждения. Повтор принятого запроса возвращает исходную попытку. Другой ключ при открытой попытке вторую
+        попытку не создаёт. Её можно найти в текущей заявке.
+      x-roles:
+      - CUSTOMER
+      x-requirements:
+      - FR-UC01-01
+      - FR-UC01-03
+      - FR-UC05-02
+      parameters:
+      - $ref: '#/components/parameters/application_id'
+      - $ref: '#/components/parameters/idempotency_key'
+      responses:
+        '201':
+          description: Попытка открыта.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttemptReceipt'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+        '409':
+          description: Команда недоступна или ключ уже использован для другого тела.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - OFFER_EXPIRED
+                      - TERMS_NOT_PROVIDED
+                      - PDN_NOTICE_NOT_ACKNOWLEDGED
+                      - SIGNING_ALREADY_IN_PROGRESS
+                      - APPLICATION_STATE_CONFLICT
+                      - IDEMPOTENCY_KEY_REUSED
+  /applications/{application_id}/signing-attempts/{attempt_id}:
+    get:
+      operationId: getSigningAttempt
+      tags:
+      - CUSTOMER
+      summary: Проверить состояние попытки
+      description: VERIFYING означает, что проверка принята и её итог неизвестен. В SIGNED присутствует contract_id. В CLOSED
+        присутствует close_reason. Старую попытку можно прочитать отдельно от новой.
+      x-roles:
+      - CUSTOMER
+      x-requirements:
+      - FR-UC01-02
+      - FR-UC01-03
+      - FR-UC01-04
+      parameters:
+      - $ref: '#/components/parameters/application_id'
+      - $ref: '#/components/parameters/attempt_id'
+      responses:
+        '200':
+          description: Операция выполнена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SigningAttemptView'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+  /applications/{application_id}/signing-attempts/{attempt_id}/sms-resends:
+    post:
+      operationId: resendSigningSms
+      tags:
+      - CUSTOMER
+      summary: Запросить повторное SMS
+      description: Максимум две повторные команды. Повтор с тем же ключом не создаёт второй команды и не расходует лимит повторно.
+        Срок попытки сохраняется.
+      x-roles:
+      - CUSTOMER
+      x-requirements:
+      - FR-UC01-01
+      - FR-UC01-04
+      parameters:
+      - $ref: '#/components/parameters/application_id'
+      - $ref: '#/components/parameters/attempt_id'
+      - $ref: '#/components/parameters/idempotency_key'
+      responses:
+        '202':
+          description: Команда отправки принята. Доставка SMS не подтверждена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SmsReceipt'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+        '409':
+          description: Команда недоступна или ключ уже использован для другого тела.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - OFFER_EXPIRED
+                      - SIGNING_ATTEMPT_EXPIRED
+                      - SIGNING_ATTEMPT_NOT_CURRENT
+                      - SIGNING_ATTEMPT_CLOSED
+                      - VERIFICATION_IN_PROGRESS
+                      - SMS_RESEND_LIMIT
+                      - IDEMPOTENCY_KEY_REUSED
+  /applications/{application_id}/signing-attempts/{attempt_id}/verification:
+    post:
+      operationId: verifySigningCode
+      tags:
+      - CUSTOMER
+      summary: Передать код на проверку
+      description: 202 означает принятие проверки, итог читается отдельным запросом. Неверный или просроченный SMS-код виден
+        как CLOSED с причиной. Повтор с тем же ключом возвращает исходное подтверждение принятия. Сессия и устройство берутся
+        из токена. Право на коммит сохраняется у своевременной проверки под блокировкой.
+      x-roles:
+      - CUSTOMER
+      x-requirements:
+      - FR-UC01-02
+      - FR-UC01-03
+      - FR-UC01-04
+      parameters:
+      - $ref: '#/components/parameters/application_id'
+      - $ref: '#/components/parameters/attempt_id'
+      - $ref: '#/components/parameters/idempotency_key'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                code:
+                  type: string
+                  minLength: 1
+                  maxLength: 32
+                  writeOnly: true
+              required:
+              - code
+      responses:
+        '202':
+          description: Проверка принята. Результат ещё не сообщён.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationReceipt'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+        '409':
+          description: Команда недоступна или ключ уже использован для другого тела.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - OFFER_EXPIRED
+                      - SIGNING_ATTEMPT_EXPIRED
+                      - SIGNING_ATTEMPT_NOT_CURRENT
+                      - SIGNING_ATTEMPT_CLOSED
+                      - VERIFICATION_IN_PROGRESS
+                      - IDEMPOTENCY_KEY_REUSED
+  /contracts/{contract_id}:
+    get:
+      operationId: getOwnContract
+      tags:
+      - CUSTOMER
+      summary: Прочитать свой договор
+      description: Время окончания охлаждения и подтверждённое время зачисления передаются раздельно.
+      x-roles:
+      - CUSTOMER
+      x-requirements:
+      - FR-UC06-01
+      - FR-UC06-02
+      - FR-UC01-06
+      - FR-UC01-08
+      - FR-UC01-09
+      parameters:
+      - $ref: '#/components/parameters/contract_id'
+      responses:
+        '200':
+          description: Операция выполнена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractView'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+  /contracts/{contract_id}/withdrawal:
+    post:
+      operationId: withdrawInMobile
+      tags:
+      - CUSTOMER
+      summary: Отказаться от получения кредита
+      description: Отказ допустим из COOLING_OFF. Побеждает первый зафиксированный переход. Для уже принятого отказа повтор
+        возвращает тот же результат.
+      x-roles:
+      - CUSTOMER
+      x-requirements:
+      - FR-UC01-05
+      parameters:
+      - $ref: '#/components/parameters/contract_id'
+      responses:
+        '200':
+          description: Операция выполнена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractCancellation'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+        '409':
+          description: Отказ недоступен. Возвращается текущий статус Договора.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WithdrawalUnavailable'
+  /contact-center/customers/{customer_id}/status:
+    get:
+      operationId: getContactCenterStatus
+      tags:
+      - CONTACT_CENTER
+      summary: Посмотреть статус в КЦ
+      description: Уполномоченный оператор ищет по учебному customer_id. Просмотр доступен до идентификации клиента. Возвращаются
+        статусы и сроки без кода отказа, балла скоринга и реквизитов счёта.
+      x-roles:
+      - CONTACT_CENTER
+      x-requirements:
+      - FR-UC06-01
+      - FR-UC06-02
+      parameters:
+      - $ref: '#/components/parameters/customer_id'
+      responses:
+        '200':
+          description: Операция выполнена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactStatus'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+  /contact-center/contracts/{contract_id}/identification:
+    post:
+      operationId: identifyContactCenterCustomer
+      tags:
+      - CONTACT_CENTER
+      summary: Получить подтверждение идентификации
+      description: LoanFlow проверяет результат имитации идентификации в доверенном контексте текущего звонка. При успехе
+        возвращает подтверждение на пять минут, привязанное к оператору, его сессии, клиенту и Договору.
+      x-roles:
+      - CONTACT_CENTER
+      x-requirements:
+      - FR-UC01-05
+      parameters:
+      - $ref: '#/components/parameters/contract_id'
+      responses:
+        '200':
+          description: Операция выполнена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentificationReceipt'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+        '409':
+          description: Команда недоступна в текущем состоянии.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - IDENTIFICATION_FAILED
+                      - WITHDRAWAL_UNAVAILABLE
+  /contact-center/contracts/{contract_id}/withdrawal:
+    post:
+      operationId: withdrawInContactCenter
+      tags:
+      - CONTACT_CENTER
+      summary: Оформить отказ через КЦ
+      description: Новая команда требует действительного подтверждения идентификации и COOLING_OFF. Для повтора ранее принятой
+        команды с тем же ключом и подтверждением возвращается сохранённый результат после проверки полномочий и исходной сессии,
+        даже если срок подтверждения истёк.
+      x-roles:
+      - CONTACT_CENTER
+      x-requirements:
+      - FR-UC01-05
+      parameters:
+      - $ref: '#/components/parameters/contract_id'
+      - $ref: '#/components/parameters/idempotency_key'
+      - $ref: '#/components/parameters/identification_token'
+      responses:
+        '200':
+          description: Операция выполнена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractCancellation'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+        '409':
+          description: Команда недоступна или ключ уже использован для другого тела.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/WithdrawalUnavailable'
+                - allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      code:
+                        type: string
+                        enum:
+                        - IDENTIFICATION_REQUIRED
+                        - IDENTIFICATION_EXPIRED
+                        - IDEMPOTENCY_KEY_REUSED
+  /branches/customers/{customer_id}/presence:
+    get:
+      operationId: checkBranchCustomerPresence
+      tags:
+      - BRANCH
+      summary: Проверить наличие активной заявки или договора
+      description: Поиск по учебному customer_id. Проверка Договоров включает действующие договоры из тестовых данных Legacy.
+        Недоступная проверка возвращает 503, а не два отрицательных признака.
+      x-roles:
+      - BRANCH
+      x-requirements:
+      - FR-UC06-01
+      - FR-UC02-01
+      parameters:
+      - $ref: '#/components/parameters/customer_id'
+      responses:
+        '200':
+          description: Операция выполнена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresenceCheck'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+  /underwriting/applications:
+    get:
+      operationId: listUnderwritingQueue
+      tags:
+      - UNDERWRITER
+      summary: Открыть очередь андеррайтера
+      description: Пилотная роль видит общую очередь UNDERWRITING.
+      x-roles:
+      - UNDERWRITER
+      x-requirements:
+      - FR-UC04-01
+      - FR-UC04-02
+      responses:
+        '200':
+          description: Текущая очередь.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UnderwritingView'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '503':
+          $ref: '#/components/responses/Http503'
+  /underwriting/applications/{application_id}:
+    get:
+      operationId: getUnderwritingApplication
+      tags:
+      - UNDERWRITER
+      summary: Открыть карточку андеррайтера
+      description: Минимальная карточка доступна пилотной роли, пока Заявка в очереди.
+      x-roles:
+      - UNDERWRITER
+      x-requirements:
+      - FR-UC04-01
+      - FR-UC04-02
+      parameters:
+      - $ref: '#/components/parameters/application_id'
+      responses:
+        '200':
+          description: Операция выполнена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnderwritingView'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+  /underwriting/applications/{application_id}/decision:
+    post:
+      operationId: recordManualDecision
+      tags:
+      - UNDERWRITER
+      summary: Принять ручное решение
+      description: Автор берётся из токена. Для REJECT внутренний код необязателен. Для APPROVE переданный код отклоняется.
+        Одобрение может дать финальный отказ по ПСК или квоте. При гонке действует первый коммит. Повтор принятой команды
+        возвращает исходное решение.
+      x-roles:
+      - UNDERWRITER
+      x-requirements:
+      - FR-UC04-01
+      - FR-UC05-01
+      parameters:
+      - $ref: '#/components/parameters/application_id'
+      - $ref: '#/components/parameters/idempotency_key'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnderwritingCommand'
+      responses:
+        '200':
+          description: Операция выполнена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManualDecisionReceipt'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+        '409':
+          description: Команда недоступна или ключ уже использован для другого тела.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - UNDERWRITING_STATE_CONFLICT
+                      - IDEMPOTENCY_KEY_REUSED
+        '422':
+          description: Запрос корректен по формату, но нарушает условия сценария.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - REJECTION_REASON_NOT_ALLOWED
+  /underwriting/escalations:
+    get:
+      operationId: listUnderwritingEscalations
+      tags:
+      - UNDERWRITING_SUPERVISOR
+      summary: Прочитать эскалации SLA
+      description: Руководитель пилотной группы читает по одной зафиксированной эскалации на нарушение SLA. Операция просмотра
+        не меняет статус.
+      x-roles:
+      - UNDERWRITING_SUPERVISOR
+      x-requirements:
+      - FR-UC04-02
+      responses:
+        '200':
+          description: Зафиксированные эскалации.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EscalationView'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '503':
+          $ref: '#/components/responses/Http503'
+  /underwriting/reports/weekly:
+    get:
+      operationId: getWeeklyUnderwritingReport
+      tags:
+      - UNDERWRITING_SUPERVISOR
+      summary: Прочитать недельный отчёт
+      description: week_start — понедельник тестового календаря. as_of — момент среза. Доли представлены числами от 0 до 1.
+        При пустом знаменателе соответствующая доля равна null.
+      x-roles:
+      - UNDERWRITING_SUPERVISOR
+      x-requirements:
+      - FR-UC04-03
+      parameters:
+      - name: week_start
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+        description: Первый день отчётной недели.
+      - name: as_of
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+        description: Момент среза отчёта.
+      responses:
+        '200':
+          description: Операция выполнена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeeklyReport'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '503':
+          $ref: '#/components/responses/Http503'
+        '422':
+          description: Запрос корректен по формату, но нарушает условия сценария.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - INVALID_REPORT_WEEK
+                      - INVALID_REPORT_CUTOFF
+  /reconciliation/instructions:
+    get:
+      operationId: listReconciliationQueue
+      tags:
+      - RECONCILIATION_OPERATOR
+      summary: Открыть очередь сверки
+      description: Очередь содержит распоряжения с начатой попыткой отправки и неизвестным исходом.
+      x-roles:
+      - RECONCILIATION_OPERATOR
+      x-requirements:
+      - FR-UC01-07
+      - FR-UC07-01
+      responses:
+        '200':
+          description: Открытые сверки.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReconciliationView'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '503':
+          $ref: '#/components/responses/Http503'
+  /reconciliation/instructions/{instruction_id}:
+    get:
+      operationId: getReconciliation
+      tags:
+      - RECONCILIATION_OPERATOR
+      summary: Открыть сверку распоряжения
+      description: Видны исходный идентификатор, результат последнего зарегистрированного чтения, сохранённая команда закрытия
+        и доступные действия. Карточка уже завершённой сверки остаётся доступной по идентификатору.
+      x-roles:
+      - RECONCILIATION_OPERATOR
+      x-requirements:
+      - FR-UC07-01
+      - FR-UC07-02
+      - FR-UC01-09
+      parameters:
+      - $ref: '#/components/parameters/instruction_id'
+      responses:
+        '200':
+          description: Операция выполнена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReconciliationView'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+  /reconciliation/instructions/{instruction_id}/reads:
+    post:
+      operationId: registerAbsRead
+      tags:
+      - RECONCILIATION_OPERATOR
+      summary: Запросить чтение в АБС
+      description: Регистрируется следующий read_seq до обращения в АБС. Повтор с тем же ключом возвращает исходный read_seq.
+        Намеренное новое чтение требует нового ключа.
+      x-roles:
+      - RECONCILIATION_OPERATOR
+      x-requirements:
+      - FR-UC07-01
+      - FR-UC07-02
+      parameters:
+      - $ref: '#/components/parameters/instruction_id'
+      - $ref: '#/components/parameters/idempotency_key'
+      responses:
+        '202':
+          description: Запрос чтения зарегистрирован.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadReceipt'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+        '409':
+          description: Команда недоступна или ключ уже использован для другого тела.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - RECONCILIATION_NOT_OPEN
+                      - IDEMPOTENCY_KEY_REUSED
+  /reconciliation/instructions/{instruction_id}/reads/{read_seq}:
+    get:
+      operationId: getAbsReadResult
+      tags:
+      - RECONCILIATION_OPERATOR
+      summary: Прочитать результат зарегистрированного чтения
+      description: Последнее чтение для допуска закрытия определяется максимальным зарегистрированным read_seq. Чтение отдельного
+        результата допуск не меняет.
+      x-roles:
+      - RECONCILIATION_OPERATOR
+      x-requirements:
+      - FR-UC07-01
+      - FR-UC07-02
+      parameters:
+      - $ref: '#/components/parameters/instruction_id'
+      - $ref: '#/components/parameters/read_seq'
+      responses:
+        '200':
+          description: Операция выполнена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadView'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+  /reconciliation/instructions/{instruction_id}/closure:
+    put:
+      operationId: requestAbsClosure
+      tags:
+      - RECONCILIATION_OPERATOR
+      summary: Запросить или повторить закрытие
+      description: Для первой команды требуется последнее чтение NOT_FOUND или PENDING. Принятая команда сохраняется до вызова
+        АБС. Повтор уполномоченным оператором использует ту же команду без нового чтения. Если итог уже сохранён, LoanFlow
+        возвращает его без обращения в АБС. 202 означает, что команда сохранена, а окончательного итога пока нет.
+      x-roles:
+      - RECONCILIATION_OPERATOR
+      x-requirements:
+      - FR-UC07-01
+      - FR-UC07-02
+      - FR-UC01-09
+      parameters:
+      - $ref: '#/components/parameters/instruction_id'
+      responses:
+        '200':
+          description: Окончательный результат сохранён.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinalReconciliation'
+        '202':
+          description: Команда закрытия принята.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClosureReceipt'
+        '400':
+          $ref: '#/components/responses/Http400'
+        '401':
+          $ref: '#/components/responses/Http401'
+        '403':
+          $ref: '#/components/responses/Http403'
+        '404':
+          $ref: '#/components/responses/Http404'
+        '503':
+          $ref: '#/components/responses/Http503'
+        '409':
+          description: Команда недоступна в текущем состоянии.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Error'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                      - CLOSURE_NOT_AUTHORIZED_BY_READ
+                      - RECONCILIATION_NOT_OPEN
+components:
+  securitySchemes:
+    StandBearer:
+      type: http
+      scheme: bearer
+      description: Токен доверенного контекста учебного стенда.
+  parameters:
+    application_id:
+      name: application_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    terms_id:
+      name: terms_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    attempt_id:
+      name: attempt_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    contract_id:
+      name: contract_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    customer_id:
+      name: customer_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    instruction_id:
+      name: instruction_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    read_seq:
+      name: read_seq
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    idempotency_key:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Один ключ на одно намерение. После потери ответа повторить тот же запрос с тем же ключом.
+    identification_token:
+      name: X-Identification-Token
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+      description: Подтверждение из доверенной учебной идентификации КЦ, привязанное к оператору, сессии, клиенту и Договору.
+  responses:
+    Http400:
+      description: Некорректный формат запроса.
+      content:
+        application/json:
+          schema:
+            allOf:
+            - $ref: '#/components/schemas/Error'
+            - type: object
+              properties:
+                code:
+                  type: string
+                  enum:
+                  - INVALID_REQUEST
+    Http401:
+      description: Необходим действительный токен.
+      content:
+        application/json:
+          schema:
+            allOf:
+            - $ref: '#/components/schemas/Error'
+            - type: object
+              properties:
+                code:
+                  type: string
+                  enum:
+                  - UNAUTHENTICATED
+    Http403:
+      description: Недостаточно прав.
+      content:
+        application/json:
+          schema:
+            allOf:
+            - $ref: '#/components/schemas/Error'
+            - type: object
+              properties:
+                code:
+                  type: string
+                  enum:
+                  - FORBIDDEN
+    Http404:
+      description: Ресурс отсутствует или недоступен вызывающему.
+      content:
+        application/json:
+          schema:
+            allOf:
+            - $ref: '#/components/schemas/Error'
+            - type: object
+              properties:
+                code:
+                  type: string
+                  enum:
+                  - NOT_FOUND
+    Http503:
+      description: Сервис недоступен. Этот ответ не подтверждает принятие или отклонение команды.
+      content:
+        application/json:
+          schema:
+            allOf:
+            - $ref: '#/components/schemas/Error'
+            - type: object
+              properties:
+                code:
+                  type: string
+                  enum:
+                  - SERVICE_UNAVAILABLE
+  schemas:
+    ApplicationStatus:
+      type: string
+      enum:
+      - DRAFT
+      - SCORING
+      - UNDERWRITING
+      - APPROVED
+      - SIGNING_IN_PROGRESS
+      - BANK_REJECTED
+      - CLIENT_CANCELED
+      - OFFER_EXPIRED
+      - SYSTEM_ERROR
+      - CONTRACT_SIGNED
+    ContractStatus:
+      type: string
+      enum:
+      - COOLING_OFF
+      - CANCELED_BY_CLIENT
+      - DISBURSEMENT_PROCESSING
+      - DISBURSED
+      - DISBURSEMENT_FAILED
+    Error:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          minLength: 1
+        message:
+          type: string
+          minLength: 1
+        application_status:
+          $ref: '#/components/schemas/ApplicationStatus'
+        contract_status:
+          $ref: '#/components/schemas/ContractStatus'
+      required:
+      - code
+      - message
+    WithdrawalUnavailable:
+      allOf:
+      - $ref: '#/components/schemas/Error'
+      - type: object
+        required:
+        - contract_status
+        properties:
+          code:
+            type: string
+            enum:
+            - WITHDRAWAL_UNAVAILABLE
+    DraftInput:
+      type: object
+      additionalProperties: false
+      properties:
+        requested_amount_minor:
+          type: string
+          pattern: ^[1-9][0-9]{0,18}$
+          description: Положительная сумма в копейках. Максимум 9223372036854775807.
+          nullable: true
+        requested_term_months:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+          nullable: true
+    DraftPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        requested_amount_minor:
+          type: string
+          pattern: ^[1-9][0-9]{0,18}$
+          description: Положительная сумма в копейках. Максимум 9223372036854775807.
+          nullable: true
+        requested_term_months:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+          nullable: true
+      minProperties: 1
+    ApplicationView:
+      type: object
+      additionalProperties: false
+      properties:
+        application_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ApplicationStatus'
+        created_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+        submitted_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+          nullable: true
+        requested_amount_minor:
+          type: string
+          pattern: ^[1-9][0-9]{0,18}$
+          description: Положительная сумма в копейках. Максимум 9223372036854775807.
+          nullable: true
+        requested_term_months:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+          nullable: true
+        offer_availability:
+          type: string
+          enum:
+          - NONE
+          - PREPARING
+          - AVAILABLE
+          - EXPIRED
+        offer_expires_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+          nullable: true
+        active_attempt_id:
+          type: string
+          format: uuid
+          nullable: true
+        contract_id:
+          type: string
+          format: uuid
+          nullable: true
+        display_reason:
+          type: string
+          description: Причина для клиента. При отсутствии финального отказа передаётся null.
+          enum:
+          - null
+          - REFUSED
+          - SELF_BAN
+          - CREDIT_REPORT_CONSENT_REQUIRED
+          nullable: true
+        available_actions:
+          type: array
+          items:
+            type: string
+            enum:
+            - EDIT_DRAFT
+            - SUBMIT
+            - CANCEL_APPLICATION
+            - OPEN_TERMS
+            - START_SIGNING
+      required:
+      - application_id
+      - status
+      - created_at
+      - submitted_at
+      - requested_amount_minor
+      - requested_term_months
+      - offer_availability
+      - offer_expires_at
+      - active_attempt_id
+      - contract_id
+      - display_reason
+      - available_actions
+    SubmissionReceipt:
+      type: object
+      additionalProperties: false
+      properties:
+        application_id:
+          type: string
+          format: uuid
+        submitted_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+        accepted_status:
+          type: string
+          enum:
+          - SCORING
+      required:
+      - application_id
+      - submitted_at
+      - accepted_status
+    ApplicationCancellation:
+      type: object
+      additionalProperties: false
+      properties:
+        application_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - CLIENT_CANCELED
+      required:
+      - application_id
+      - status
+    PdnNotice:
+      type: object
+      additionalProperties: false
+      properties:
+        version:
+          type: string
+          minLength: 1
+        text:
+          type: string
+          minLength: 1
+        shown_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+          nullable: true
+      required:
+      - version
+      - text
+      - shown_at
+    OfferPreparing:
+      type: object
+      additionalProperties: false
+      properties:
+        state:
+          type: string
+          enum:
+          - PREPARING
+        offer_id:
+          type: string
+          format: uuid
+      required:
+      - state
+      - offer_id
+    TermsAvailable:
+      type: object
+      additionalProperties: false
+      properties:
+        state:
+          type: string
+          enum:
+          - AVAILABLE
+          - EXPIRED
+        offer_id:
+          type: string
+          format: uuid
+        terms_id:
+          type: string
+          format: uuid
+        amount_minor:
+          type: string
+          pattern: ^[1-9][0-9]{0,18}$
+          description: Положительная сумма в копейках. Максимум 9223372036854775807.
+        term_months:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        annual_rate_percent:
+          type: string
+          pattern: ^(0|[1-9][0-9]*)(\.[0-9]+)?$
+        monthly_payment_minor:
+          type: string
+          pattern: ^(0|[1-9][0-9]{0,18})$
+        psk_annual_percent:
+          type: string
+          pattern: ^(0|[1-9][0-9]*)(\.[0-9]+)?$
+        psk_rub:
+          type: string
+          pattern: ^(0|[1-9][0-9]*)\.[0-9]{2}$
+        first_provided_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+        offer_expires_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+        document_sha256:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+        cooling_hours:
+          type: integer
+          enum:
+          - 0
+          - 4
+          - 48
+        withdrawal_available_during_cooling:
+          type: boolean
+        pdn_notice_required:
+          type: boolean
+        pdn_notice:
+          $ref: '#/components/schemas/PdnNotice'
+      required:
+      - state
+      - offer_id
+      - terms_id
+      - amount_minor
+      - term_months
+      - annual_rate_percent
+      - monthly_payment_minor
+      - psk_annual_percent
+      - psk_rub
+      - first_provided_at
+      - offer_expires_at
+      - document_sha256
+      - cooling_hours
+      - withdrawal_available_during_cooling
+      - pdn_notice_required
+      oneOf:
+      - properties:
+          pdn_notice_required:
+            type: boolean
+            enum:
+            - true
+        required:
+        - pdn_notice
+      - properties:
+          pdn_notice_required:
+            type: boolean
+            enum:
+            - false
+        not:
+          required:
+          - pdn_notice
+    NoticeAcknowledgement:
+      type: object
+      additionalProperties: false
+      properties:
+        notice_version:
+          type: string
+          minLength: 1
+        shown_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+      required:
+      - notice_version
+      - shown_at
+    AttemptReceipt:
+      type: object
+      additionalProperties: false
+      properties:
+        application_id:
+          type: string
+          format: uuid
+        attempt_id:
+          type: string
+          format: uuid
+        expires_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+        offer_expires_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+      required:
+      - application_id
+      - attempt_id
+      - expires_at
+      - offer_expires_at
+    SmsReceipt:
+      type: object
+      additionalProperties: false
+      properties:
+        attempt_id:
+          type: string
+          format: uuid
+        resend_number:
+          type: integer
+          minimum: 1
+          maximum: 2
+        accepted_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+      required:
+      - attempt_id
+      - resend_number
+      - accepted_at
+    VerificationReceipt:
+      type: object
+      additionalProperties: false
+      properties:
+        attempt_id:
+          type: string
+          format: uuid
+        accepted_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+      required:
+      - attempt_id
+      - accepted_at
+    SigningAttemptView:
+      type: object
+      additionalProperties: false
+      properties:
+        attempt_id:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum:
+          - OPEN
+          - VERIFYING
+          - SIGNED
+          - CLOSED
+        expires_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+        offer_expires_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+        resends_remaining:
+          type: integer
+          minimum: 0
+          maximum: 2
+        can_resend:
+          type: boolean
+        can_verify:
+          type: boolean
+        close_reason:
+          type: string
+          enum:
+          - INVALID_CODE
+          - CODE_EXPIRED
+          - DELIVERY_FAILED
+          - ATTEMPT_EXPIRED
+          - OFFER_EXPIRED
+        contract_id:
+          type: string
+          format: uuid
+      required:
+      - attempt_id
+      - state
+      - expires_at
+      - offer_expires_at
+      - resends_remaining
+      - can_resend
+      - can_verify
+      oneOf:
+      - properties:
+          state:
+            type: string
+            enum:
+            - OPEN
+        not:
+          anyOf:
+          - required:
+            - close_reason
+          - required:
+            - contract_id
+      - properties:
+          state:
+            type: string
+            enum:
+            - VERIFYING
+          can_resend:
+            type: boolean
+            enum:
+            - false
+          can_verify:
+            type: boolean
+            enum:
+            - false
+        not:
+          anyOf:
+          - required:
+            - close_reason
+          - required:
+            - contract_id
+      - properties:
+          state:
+            type: string
+            enum:
+            - SIGNED
+        required:
+        - contract_id
+        not:
+          required:
+          - close_reason
+      - properties:
+          state:
+            type: string
+            enum:
+            - CLOSED
+        required:
+        - close_reason
+        not:
+          required:
+          - contract_id
+    ContractView:
+      type: object
+      additionalProperties: false
+      properties:
+        contract_id:
+          type: string
+          format: uuid
+        application_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ContractStatus'
+        signed_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+        cooling_ends_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+          nullable: true
+        posted_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+          nullable: true
+        can_withdraw:
+          type: boolean
+      required:
+      - contract_id
+      - application_id
+      - status
+      - signed_at
+      - cooling_ends_at
+      - posted_at
+      - can_withdraw
+    ContractCancellation:
+      type: object
+      additionalProperties: false
+      properties:
+        contract_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - CANCELED_BY_CLIENT
+      required:
+      - contract_id
+      - status
+    ContactApplication:
+      type: object
+      additionalProperties: false
+      properties:
+        application_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ApplicationStatus'
+      required:
+      - application_id
+      - status
+    ContactContract:
+      type: object
+      additionalProperties: false
+      properties:
+        contract_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ContractStatus'
+        cooling_ends_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+          nullable: true
+        posted_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+          nullable: true
+        withdrawal_available_after_identification:
+          type: boolean
+      required:
+      - contract_id
+      - status
+      - cooling_ends_at
+      - posted_at
+      - withdrawal_available_after_identification
+    ContactStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        customer_id:
+          type: string
+          format: uuid
+        applications:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContactApplication'
+        contracts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContactContract'
+      required:
+      - customer_id
+      - applications
+      - contracts
+    IdentificationReceipt:
+      type: object
+      additionalProperties: false
+      properties:
+        identification_token:
+          type: string
+          minLength: 1
+        expires_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+      required:
+      - identification_token
+      - expires_at
+    PresenceCheck:
+      type: object
+      additionalProperties: false
+      properties:
+        has_active_application:
+          type: boolean
+        has_active_contract:
+          type: boolean
+      required:
+      - has_active_application
+      - has_active_contract
+    UnderwritingView:
+      type: object
+      additionalProperties: false
+      properties:
+        application_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - UNDERWRITING
+        submitted_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+        requested_amount_minor:
+          type: string
+          pattern: ^[1-9][0-9]{0,18}$
+          description: Положительная сумма в копейках. Максимум 9223372036854775807.
+        requested_term_months:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        sla_deadline_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+        escalated_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+          nullable: true
+      required:
+      - application_id
+      - status
+      - submitted_at
+      - requested_amount_minor
+      - requested_term_months
+      - sla_deadline_at
+      - escalated_at
+    UnderwritingCommand:
+      type: object
+      additionalProperties: false
+      properties:
+        command:
+          type: string
+          enum:
+          - APPROVE
+          - REJECT
+        rejection_reason_code:
+          type: string
+          pattern: ^[A-Z][A-Z0-9_]{0,63}$
+      required:
+      - command
+    ManualDecisionReceipt:
+      type: object
+      additionalProperties: false
+      properties:
+        application_id:
+          type: string
+          format: uuid
+        command:
+          type: string
+          enum:
+          - APPROVE
+          - REJECT
+        decision:
+          type: string
+          enum:
+          - APPROVED
+          - REJECTED
+        application_status:
+          type: string
+          enum:
+          - APPROVED
+          - BANK_REJECTED
+        decided_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+        rejection_reason_code:
+          type: string
+          minLength: 1
+      required:
+      - application_id
+      - command
+      - decision
+      - application_status
+      - decided_at
+    UnderwriterWeeklyMetrics:
+      type: object
+      additionalProperties: false
+      properties:
+        underwriter_id:
+          type: string
+          minLength: 1
+        decision_count:
+          type: integer
+          minimum: 0
+        median_time_to_decision_seconds:
+          type: number
+          minimum: 0
+          nullable: true
+        approval_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+          nullable: true
+        overdue_rate:
+          type: number
+          minimum: 0
+          maximum: 1
+          nullable: true
+        overdue_count:
+          type: integer
+          minimum: 0
+        observed_loan_count:
+          type: integer
+          minimum: 0
+      required:
+      - underwriter_id
+      - decision_count
+      - median_time_to_decision_seconds
+      - approval_rate
+      - overdue_rate
+      - overdue_count
+      - observed_loan_count
+    WeeklyReport:
+      type: object
+      additionalProperties: false
+      properties:
+        week_start:
+          type: string
+          format: date
+        time_zone:
+          type: string
+          minLength: 1
+        as_of:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+        underwriters:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnderwriterWeeklyMetrics'
+      required:
+      - week_start
+      - time_zone
+      - as_of
+      - underwriters
+    EscalationView:
+      type: object
+      additionalProperties: false
+      properties:
+        application_id:
+          type: string
+          format: uuid
+        sla_deadline_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+        escalated_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+        application_status:
+          $ref: '#/components/schemas/ApplicationStatus'
+      required:
+      - application_id
+      - sla_deadline_at
+      - escalated_at
+      - application_status
+    ReadView:
+      type: object
+      additionalProperties: false
+      properties:
+        instruction_id:
+          type: string
+          format: uuid
+        read_seq:
+          type: integer
+          format: int64
+          minimum: 1
+        requested_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+        result:
+          type: string
+          enum:
+          - WAITING
+          - NOT_FOUND
+          - PENDING
+          - POSTED
+          - CLOSED
+          - TIMEOUT
+          - CONFLICT
+          - CORRELATION_ERROR
+      required:
+      - instruction_id
+      - read_seq
+      - requested_at
+      - result
+    CorrelationDiagnostic:
+      type: object
+      additionalProperties: false
+      properties:
+        operation:
+          type: string
+          enum:
+          - SEND
+          - CLOSE
+        mismatch_kind:
+          type: string
+          enum:
+          - INSTRUCTION_ID
+          - ACCOUNT
+          - AMOUNT
+          - CURRENCY
+        observed_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+      required:
+      - operation
+      - mismatch_kind
+      - observed_at
+    ReconciliationView:
+      type: object
+      additionalProperties: false
+      properties:
+        instruction_id:
+          type: string
+          format: uuid
+        contract_id:
+          type: string
+          format: uuid
+        contract_status:
+          type: string
+          enum:
+          - DISBURSEMENT_PROCESSING
+          - DISBURSED
+          - DISBURSEMENT_FAILED
+        close_command_accepted:
+          type: boolean
+        can_close:
+          type: boolean
+        can_retry_close:
+          type: boolean
+        last_read:
+          $ref: '#/components/schemas/ReadView'
+        final_result:
+          type: string
+          enum:
+          - POSTED
+          - CLOSED
+        last_correlation_error:
+          $ref: '#/components/schemas/CorrelationDiagnostic'
+      required:
+      - instruction_id
+      - contract_id
+      - contract_status
+      - close_command_accepted
+      - can_close
+      - can_retry_close
+      oneOf:
+      - properties:
+          contract_status:
+            type: string
+            enum:
+            - DISBURSEMENT_PROCESSING
+        not:
+          required:
+          - final_result
+      - properties:
+          contract_status:
+            type: string
+            enum:
+            - DISBURSED
+          final_result:
+            type: string
+            enum:
+            - POSTED
+          can_close:
+            type: boolean
+            enum:
+            - false
+          can_retry_close:
+            type: boolean
+            enum:
+            - false
+        required:
+        - final_result
+      - properties:
+          contract_status:
+            type: string
+            enum:
+            - DISBURSEMENT_FAILED
+          final_result:
+            type: string
+            enum:
+            - CLOSED
+          can_close:
+            type: boolean
+            enum:
+            - false
+          can_retry_close:
+            type: boolean
+            enum:
+            - false
+        required:
+        - final_result
+    ReadReceipt:
+      type: object
+      additionalProperties: false
+      properties:
+        instruction_id:
+          type: string
+          format: uuid
+        read_seq:
+          type: integer
+          format: int64
+          minimum: 1
+      required:
+      - instruction_id
+      - read_seq
+    ClosureReceipt:
+      type: object
+      additionalProperties: false
+      properties:
+        instruction_id:
+          type: string
+          format: uuid
+        close_command_accepted:
+          type: boolean
+          enum:
+          - true
+      required:
+      - instruction_id
+      - close_command_accepted
+    FinalReconciliation:
+      type: object
+      additionalProperties: false
+      properties:
+        instruction_id:
+          type: string
+          format: uuid
+        contract_id:
+          type: string
+          format: uuid
+        final_result:
+          type: string
+          enum:
+          - POSTED
+          - CLOSED
+        contract_status:
+          type: string
+          enum:
+          - DISBURSED
+          - DISBURSEMENT_FAILED
+      required:
+      - instruction_id
+      - contract_id
+      - final_result
+      - contract_status
+      oneOf:
+      - properties:
+          contract_status:
+            type: string
+            enum:
+            - DISBURSED
+          final_result:
+            type: string
+            enum:
+            - POSTED
+      - properties:
+          contract_status:
+            type: string
+            enum:
+            - DISBURSEMENT_FAILED
+          final_result:
+            type: string
+            enum:
+            - CLOSED

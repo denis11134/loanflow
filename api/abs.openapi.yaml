@@ -1,0 +1,341 @@
+openapi: 3.0.3
+info:
+  title: LoanFlow · API учебной АБС
+  version: 1.0.0
+  description: Служебный контракт для LoanFlow. Ответы протокола для корректного запроса содержат instruction_id. Таймаут
+    транспорта может не вернуть никакого ответа.
+security:
+- ServiceBearer: []
+paths:
+  /instructions/{instruction_id}:
+    put:
+      operationId: sendInstruction
+      summary: Передать распоряжение
+      description: Идентификатор берётся из пути, остальные реквизиты из тела. Повтор с исходными реквизитами возвращает текущее
+        состояние. Если идентификатор закрыт до доставки, АБС возвращает CLOSED и блокирует исполнение. Ранее принятые реквизиты
+        остаются неизменяемыми.
+      parameters:
+      - $ref: '#/components/parameters/instruction_id'
+      responses:
+        '200':
+          description: Состояние распоряжения.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/Pending'
+                - $ref: '#/components/schemas/Posted'
+                - $ref: '#/components/schemas/Closed'
+        '401':
+          description: Необходим действительный служебный токен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthenticated'
+        '403':
+          description: Недостаточно полномочий.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Forbidden'
+        '503':
+          description: АБС недоступна. Окончательный исход неизвестен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unavailable'
+        '422':
+          description: Некорректные реквизиты распоряжения.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidInstruction'
+        '409':
+          description: Тот же идентификатор и другие реквизиты.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequisitesConflict'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InstructionPayload'
+    get:
+      operationId: readInstruction
+      summary: Прочитать распоряжение
+      description: Отсутствие записи возвращается как бизнес-состояние NOT_FOUND. Поздняя доставка всё ещё возможна.
+        Если по распоряжению временно нельзя подтвердить согласованное состояние, АБС возвращает READ_CONFLICT
+        с исходным идентификатором. Сохранённый терминальный результат возвращается как POSTED или CLOSED.
+      parameters:
+      - $ref: '#/components/parameters/instruction_id'
+      responses:
+        '200':
+          description: Состояние распоряжения.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/NotFound'
+                - $ref: '#/components/schemas/Pending'
+                - $ref: '#/components/schemas/Posted'
+                - $ref: '#/components/schemas/Closed'
+        '409':
+          description: Чтение не подтвердило состояние распоряжения. Требуется новое чтение.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadConflict'
+        '401':
+          description: Необходим действительный служебный токен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthenticated'
+        '403':
+          description: Недостаточно полномочий.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Forbidden'
+        '503':
+          description: АБС недоступна. Окончательный исход неизвестен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unavailable'
+  /instructions/{instruction_id}/closure:
+    put:
+      operationId: closeInstruction
+      summary: Окончательно закрыть распоряжение
+      description: Закрытие и проводка взаимоисключающие. Если проводка уже выполнена, результат POSTED. Иначе АБС фиксирует
+        CLOSED и блокирует исполнение, в том числе позднюю доставку. Повтор возвращает сохранённый итог.
+      parameters:
+      - $ref: '#/components/parameters/instruction_id'
+      responses:
+        '200':
+          description: Состояние распоряжения.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/Posted'
+                - $ref: '#/components/schemas/Closed'
+        '401':
+          description: Необходим действительный служебный токен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unauthenticated'
+        '403':
+          description: Недостаточно полномочий.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Forbidden'
+        '503':
+          description: АБС недоступна. Окончательный исход неизвестен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unavailable'
+components:
+  securitySchemes:
+    ServiceBearer:
+      type: http
+      scheme: bearer
+      description: Токен доверенного контекста учебного стенда.
+  parameters:
+    instruction_id:
+      name: instruction_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    InstructionPayload:
+      type: object
+      additionalProperties: false
+      properties:
+        account_ref:
+          type: string
+          minLength: 1
+        amount_minor:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9223372036854775807
+        currency:
+          type: string
+          enum:
+          - RUB
+      required:
+      - account_ref
+      - amount_minor
+      - currency
+    NotFound:
+      type: object
+      additionalProperties: false
+      properties:
+        instruction_id:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum:
+          - NOT_FOUND
+      required:
+      - instruction_id
+      - state
+    Pending:
+      type: object
+      additionalProperties: false
+      properties:
+        instruction_id:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum:
+          - PENDING
+      required:
+      - instruction_id
+      - state
+    Closed:
+      type: object
+      additionalProperties: false
+      properties:
+        instruction_id:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum:
+          - CLOSED
+      required:
+      - instruction_id
+      - state
+    Posted:
+      type: object
+      additionalProperties: false
+      properties:
+        instruction_id:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum:
+          - POSTED
+        posting_ref:
+          type: string
+          minLength: 1
+        account_ref:
+          type: string
+          minLength: 1
+        amount_minor:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9223372036854775807
+        currency:
+          type: string
+          enum:
+          - RUB
+        posted_at:
+          type: string
+          format: date-time
+          description: Момент времени с явным смещением.
+      required:
+      - instruction_id
+      - state
+      - posting_ref
+      - account_ref
+      - amount_minor
+      - currency
+      - posted_at
+    ReadConflict:
+      type: object
+      additionalProperties: false
+      properties:
+        instruction_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          enum:
+          - READ_CONFLICT
+      required:
+      - instruction_id
+      - code
+    RequisitesConflict:
+      type: object
+      additionalProperties: false
+      properties:
+        instruction_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          enum:
+          - REQUISITES_CONFLICT
+      required:
+      - instruction_id
+      - code
+    Unavailable:
+      type: object
+      additionalProperties: false
+      properties:
+        instruction_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          enum:
+          - SERVICE_UNAVAILABLE
+      required:
+      - instruction_id
+      - code
+    Unauthenticated:
+      type: object
+      additionalProperties: false
+      properties:
+        instruction_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          enum:
+          - UNAUTHENTICATED
+      required:
+      - instruction_id
+      - code
+    Forbidden:
+      type: object
+      additionalProperties: false
+      properties:
+        instruction_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          enum:
+          - FORBIDDEN
+      required:
+      - instruction_id
+      - code
+    InvalidInstruction:
+      type: object
+      additionalProperties: false
+      properties:
+        instruction_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          enum:
+          - INVALID_INSTRUCTION
+      required:
+      - instruction_id
+      - code
