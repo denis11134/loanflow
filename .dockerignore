@@ -1,0 +1,8 @@
+**
+!services/
+!services/**
+!api/
+!api/*.openapi.yaml
+!sql/
+!sql/001_initial_schema.sql
+**/__pycache__/
