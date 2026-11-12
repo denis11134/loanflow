@@ -72,6 +72,10 @@ nav:
       - 2.3. API и OpenAPI-контракт: 05-api/2.3-openapi-contract.md
   - Интеграции:
       - 06-integrations/index.md
+      - 4.1. Интеграционная архитектура:
+          - 06-integrations/4.1-integration-architecture.md
+          - Оценка заявки: 06-integrations/4.1-application-assessment.md
+          - Выдача через учебную АБС: 06-integrations/4.1-abs-disbursement.md
       - Контракт учебной АБС: 06-integrations/abs-contract.md
   - Архитектура: 07-architecture/index.md
   - 1.7. Прототипы: 08-prototypes/index.md
