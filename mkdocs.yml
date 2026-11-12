@@ -61,6 +61,7 @@ nav:
   - Требования:
       - 03-requirements/index.md
       - 1.6. Требования MVP: 03-requirements/1.6-mvp-requirements.md
+      - 3.3. Постановки задач: 03-requirements/3.3-calculation-tasks.md
   - Модель данных:
       - 04-data/index.md
       - 2.1. Логическая ER-модель: 04-data/2.1-logical-er-model.md

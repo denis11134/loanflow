@@ -9,13 +9,8 @@
         "credit_report_ref": "stand-report-1",
         "payroll_income_rub": "55000.00",
         "existing_payments_rub": "25000.00",
-        "requested_payment_rub": "5000.00",
-        "de_result": "APPROVED",
-        "offer": {
-          "amount_rub": "50000.00", "term_months": 12, "annual_rate_percent": "20",
-          "monthly_payment_rub": "5000.00", "psk_annual_percent": "23.8",
-          "psk_rub": "10000.00", "psk_limit": "25", "quota_period": "demo", "quota_bucket": "standard"
-        }
+        "quota_period": "demo",
+        "quota_bucket": "standard"
       }
     }
   },

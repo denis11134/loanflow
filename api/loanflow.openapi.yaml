@@ -175,6 +175,8 @@ paths:
       - CUSTOMER
       summary: Подать заявку
       description: У принятой подачи повтор всегда возвращает исходные идентификатор, время и SCORING, даже после смены статуса.
+        Новая подача проверяет сумму от 100000 до 100000000 копеек и срок от 1 до 60 месяцев включительно
+        после проверки обязательных полей. При выходе за диапазон Заявка остаётся в DRAFT.
         Текущий статус читается отдельно. Конкурирующая подача по клиенту проверяется после сериализации.
       x-roles:
       - CUSTOMER
@@ -227,6 +229,7 @@ paths:
                       type: string
                       enum:
                       - REQUIRED_FIELDS_MISSING
+                      - APPLICATION_PARAMETERS_OUT_OF_RANGE
                       - CUSTOMER_NOT_ELIGIBLE
   /applications/{application_id}/cancellation:
     post:
@@ -1717,9 +1720,11 @@ components:
           pattern: ^(0|[1-9][0-9]*)(\.[0-9]+)?$
         monthly_payment_minor:
           type: string
+          description: Регулярный платёж в копейках.
           pattern: ^(0|[1-9][0-9]{0,18})$
         psk_annual_percent:
           type: string
+          description: Сохранённая годовая ПСК. Для расчётов 3.3 сохраняются 12 знаков после запятой.
           pattern: ^(0|[1-9][0-9]*)(\.[0-9]+)?$
         psk_rub:
           type: string

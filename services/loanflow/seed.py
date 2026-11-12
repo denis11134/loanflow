@@ -13,7 +13,7 @@ DEMO = ROOT / "services/scenarios.json"
 
 
 def seed(path=DEMO, dsn=None):
-    data = json.loads(Path(path).read_text())
+    data = json.loads(Path(path).read_text(), parse_float=str)
     tokens = {}
     customers = {}
     with connect(dsn) as db:

@@ -1,6 +1,7 @@
 from decimal import Decimal
 from uuid import uuid4
 
+from .calculations import MAX_AMOUNT_RUB, MAX_TERM_MONTHS, MIN_AMOUNT_RUB, MIN_TERM_MONTHS, RULES_VERSION
 from .store import ApiError, enqueue, lock_application, one, require, reserve_transition
 
 ACTIVE = ("SCORING", "UNDERWRITING", "APPROVED", "SIGNING_IN_PROGRESS")
@@ -38,15 +39,20 @@ def own_application(ctx, application_id, lock=False):
 def offer_row(db, application_id):
     return one(db, """
         SELECT o.*, t.terms_id, t.document_sha256, t.first_provided_at, t.offer_expires_at,
-               t.warning_first_shown_at, t.warning_text_version, e.pdn_percent, r.state AS reserve_state
+               t.warning_first_shown_at, t.warning_text_version, r.state AS reserve_state,
+               CASE WHEN s.rules_version IS NULL THEN e.pdn_percent > 50
+                    ELSE (e.monthly_existing_payments_rub + e.requested_monthly_payment_rub) * 100
+                         > e.monthly_payroll_income_rub * 50
+               END AS pdn_notice_required
         FROM offer o LEFT JOIN individual_terms t USING (offer_id)
         JOIN mpl_reservation r USING (offer_id) LEFT JOIN evaluation e ON e.application_id=o.application_id
+        JOIN submission_snapshot s ON s.application_id=o.application_id
         WHERE o.application_id=%s
         """, (application_id,))
 
 
 def notice_required(offer):
-    return offer["pdn_percent"] is not None and offer["pdn_percent"] > 50
+    return bool(offer["pdn_notice_required"])
 
 
 def view(ctx, row):
@@ -135,8 +141,11 @@ def submit_application(ctx, application_id):
     if submitted_at is None:
         if app["status"] != "DRAFT":
             raise ApiError(409, "APPLICATION_STATE_CONFLICT")
-        if app["draft_amount_rub"] is None or app["draft_term_months"] is None:
+        amount, term = app["draft_amount_rub"], app["draft_term_months"]
+        if amount is None or term is None:
             raise ApiError(422, "REQUIRED_FIELDS_MISSING")
+        if not (MIN_AMOUNT_RUB <= amount <= MAX_AMOUNT_RUB and MIN_TERM_MONTHS <= term <= MAX_TERM_MONTHS):
+            raise ApiError(422, "APPLICATION_PARAMETERS_OUT_OF_RANGE")
         profile = one(db, """SELECT is_payroll, version_ref FROM customer
                              LEFT JOIN stand_profile USING (customer_id) WHERE customer_id=%s""",
                       (app["customer_id"],))
@@ -150,8 +159,9 @@ def submit_application(ctx, application_id):
         db.execute("UPDATE application SET status='SCORING',submitted_at=%s WHERE application_id=%s",
                    (submitted_at, application_id))
         db.execute("""INSERT INTO submission_snapshot (application_id,requested_amount_rub,
-                      requested_term_months,is_payroll,profile_version_ref) VALUES (%s,%s,%s,%s,%s)""",
-                   (application_id, app["draft_amount_rub"], app["draft_term_months"], True, profile["version_ref"]))
+                      requested_term_months,is_payroll,profile_version_ref,rules_version)
+                      VALUES (%s,%s,%s,%s,%s,%s)""",
+                   (application_id, amount, term, True, profile["version_ref"], RULES_VERSION))
         enqueue(db, "AML", application_id, submitted_at)
     return 202, {"application_id": application_id, "submitted_at": submitted_at, "accepted_status": "SCORING"}
 

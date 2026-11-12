@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from http.client import HTTPConnection
 import json
 import hashlib
@@ -17,7 +18,7 @@ import uvicorn
 from reportlab.pdfbase.ttfonts import TTFError
 
 from api_support import document, operations, response_schema, validator
-from services.loanflow import applications, assessment
+from services.loanflow import applications, assessment, calculations
 from services.loanflow.api import create_app
 from services.loanflow.seed import DEMO, seed
 from services.loanflow.signing import stand_code
@@ -99,9 +100,9 @@ class Stand:
             cursor = db.execute(query, params)
             return cursor.fetchall() if cursor.description else None
 
-    def draft(self, actor="mobile", amount="5000000"):
+    def draft(self, actor="mobile", amount="5000000", term=12):
         return self.request("POST", "/applications", 201, actor,
-                            {"requested_amount_minor": amount, "requested_term_months": 12}, uuid4())["application_id"]
+                            {"requested_amount_minor": amount, "requested_term_months": term}, uuid4())["application_id"]
 
 
 @pytest.fixture
@@ -134,6 +135,11 @@ def test_submission_http_restart_and_race(setup_stand):
         assert stand.request("POST", f"/applications/{app}/submission", 422)["code"] == "REQUIRED_FIELDS_MISSING"
         patch = {"requested_amount_minor": "9223372036854775807", "requested_term_months": 12}
         assert stand.request("PATCH", f"/applications/{app}", 200, body=patch, key=uuid4())["requested_amount_minor"] == patch["requested_amount_minor"]
+        assert stand.request("POST", f"/applications/{app}/submission", 422)["code"] == "APPLICATION_PARAMETERS_OUT_OF_RANGE"
+        assert stand.request("GET", f"/applications/{app}", 200)["status"] == "DRAFT"
+        assert not stand.sql("SELECT * FROM submission_snapshot")
+        assert not stand.sql("SELECT * FROM service_job")
+        stand.request("PATCH", f"/applications/{app}", 200, body={"requested_amount_minor": "100000"}, key=uuid4())
         assert stand.request("POST", "/applications", 400, body={"requested_amount_minor": "9223372036854775808"}, key=uuid4())["code"] == "INVALID_REQUEST"
         assert stand.request("GET", f"/applications/{app}", 404, "other") == stand.request("GET", f"/applications/{uuid4()}", 404, "other")
         assert stand.request("GET", "/applications", 403, "branch")["code"] == "FORBIDDEN"
@@ -193,17 +199,19 @@ def update_scenario(stand, values, actor="mobile"):
               (json.dumps(values), f"10000000-0000-0000-0000-00000000000{customer}"))
 
 
-def submit(stand, actor="mobile"):
-    app = stand.draft(actor)
+def submit(stand, actor="mobile", **draft):
+    app = stand.draft(actor, **draft)
     stand.request("POST", f"/applications/{app}/submission", 202, actor)
     return app
 
 
 def prepare_offer(stand, amount=None):
-    if amount:
-        stand.sql("""UPDATE stand_profile SET scenario=jsonb_set(scenario,'{offer,amount_rub}',to_jsonb(%s::text))""",
-                  (amount,))
-    app = submit(stand)
+    if amount is None:
+        app = submit(stand)
+    else:
+        if Decimal(amount) >= 200_000:
+            update_scenario(stand, {"payroll_income_rub": "80000.00"})
+        app = submit(stand, amount=applications.minor(Decimal(amount)))
     process(stand, "AML", "CREDIT_REPORT", "DE")
     assert stand.request("GET", f"/applications/{app}/offer", 200)["state"] == "PREPARING"
     process(stand, "PUBLISH")
@@ -282,7 +290,7 @@ def test_worker_recovery_retries_and_late_assessment(setup_stand):
     ({"aml_block": True, "self_ban": True}, "REFUSED", ["AML"]),
     ({"consent_ref": None}, "CREDIT_REPORT_CONSENT_REQUIRED", ["AML"]),
     ({"self_ban": True}, "SELF_BAN", ["AML", "CREDIT_REPORT"]),
-    ({"de_result": "REJECTED"}, "REFUSED", ["AML", "CREDIT_REPORT", "DE"]),
+    ({"payroll_income_rub": "40000.00"}, "REFUSED", ["AML", "CREDIT_REPORT", "DE"]),
 ])
 def test_assessment_stop_factors(setup_stand, patch, reason, operations):
     stand = setup_stand
@@ -292,21 +300,27 @@ def test_assessment_stop_factors(setup_stand, patch, reason, operations):
         process(stand, *operations)
         assert stand.request("GET", f"/applications/{app}", 200)["display_reason"] == reason
         assert [r["operation"] for r in stand.sql("SELECT operation FROM stand_adapter_call ORDER BY call_id")] == operations
+        if operations[-1] == "DE":
+            assert stand.sql("SELECT rejection_reason_code FROM final_decision") == [
+                {"rejection_reason_code": "SCORING_BELOW_THRESHOLD"}]
 
 
 def test_underwriting_last_quota_sla_and_weekly_report(setup_stand):
     stand = setup_stand
     with stand.serve():
         stand.sql("UPDATE mpl_quota SET capacity=1")
-        for actor in ("mobile", "other"):
-            update_scenario(stand, {"de_result": "MANUAL_REVIEW"}, actor)
-        apps = {actor: submit(stand, actor) for actor in ("mobile", "other")}
+        apps = {actor: submit(stand, actor, term=37) for actor in ("mobile", "other")}
         process(stand, "AML", "AML", "CREDIT_REPORT", "CREDIT_REPORT", "DE", "DE")
         cards = stand.request("GET", "/underwriting/applications", 200, "underwriter")
         assert len(cards) == 2
         assert all(card["sla_deadline_at"] == "2026-11-09T05:30:00+00:00" for card in cards)
         for app in apps.values():
             assert stand.request("GET", f"/underwriting/applications/{app}", 200, "underwriter") in cards
+        prepared = stand.sql("SELECT recommendation FROM evaluation")
+        assert prepared[0] == prepared[1]
+        conditions = prepared[0]["recommendation"]
+        for actor in ("mobile", "other"):
+            update_scenario(stand, {"quota_period": "unexpected", "payroll_income_rub": "0"}, actor)
         stand.clock.at = datetime(2026, 11, 9, 5, 30, 1, tzinfo=timezone.utc)
 
         def approve(app):
@@ -321,6 +335,10 @@ def test_underwriting_last_quota_sla_and_weekly_report(setup_stand):
             results = list(pool.map(approve, apps.values()))
         assert sorted(r["decision"] for r in results) == ["APPROVED", "REJECTED"]
         assert next(r for r in results if r["decision"] == "REJECTED")["rejection_reason_code"] == "MPL_QUOTA_EXHAUSTED"
+        approved, = stand.sql("SELECT * FROM offer")
+        assert approved["term_months"] == conditions["term_months"] == 37
+        for field in ("amount_rub", "annual_rate_percent", "monthly_payment_rub", "psk_annual_percent", "psk_rub"):
+            assert approved[field] == Decimal(conditions[field])
         assert_reserve(stand, "HELD")
         assert stand.request("GET", "/underwriting/escalations", 200, "supervisor") == []
         process(stand, "SLA", "SLA")
@@ -330,17 +348,104 @@ def test_underwriting_last_quota_sla_and_weekly_report(setup_stand):
         assert report["decision_count"] == 2 and report["approval_rate"] == 0.5 and report["overdue_rate"] is None
 
 
-@pytest.mark.parametrize(("psk", "approved"), [("24.99999", True), ("25", True), ("25.00001", False)])
-def test_psk_and_publication_recovery(setup_stand, psk, approved):
+@pytest.mark.parametrize(("amount", "term", "accepted"), [
+    ("99999", 1, False), ("100000", 1, True), ("100000000", 60, True),
+    ("100000001", 60, False), ("100000", 61, False),
+])
+def test_product_range_is_checked_on_submission(setup_stand, amount, term, accepted):
     stand = setup_stand
-    stand.sql("UPDATE stand_profile SET scenario=jsonb_set(scenario,'{offer,psk_annual_percent}',to_jsonb(%s::text))",
-              (psk,))
     with stand.serve():
+        app = stand.draft(amount=amount, term=term)
+        path = f"/applications/{app}"
+        receipt = stand.request("POST", path + "/submission", 202 if accepted else 422)
+        if accepted:
+            assert stand.sql("SELECT rules_version FROM submission_snapshot") == [{"rules_version": "3.3"}]
+            assert stand.request("POST", path + "/submission", 202) == receipt
+        else:
+            assert receipt["code"] == "APPLICATION_PARAMETERS_OUT_OF_RANGE"
+            assert stand.request("GET", path, 200)["status"] == "DRAFT"
+            assert not stand.sql("SELECT * FROM submission_snapshot")
+            assert not stand.sql("SELECT * FROM service_job")
+
+
+def test_calculation_migration_requires_empty_assessment_queue(setup_stand):
+    stand = setup_stand
+    with stand.serve():
+        approved, offer = prepare_offer(stand)
+        doc_path = f"/applications/{approved}/terms/{offer['terms_id']}/document"
+        pdf = stand.request("GET", doc_path, 200)
+        pending = submit(stand, actor="other")
+
+        # Восстанавливаем схему до миграции 007, сохраняя заявки и ИУ.
+        stand.sql("ALTER TABLE submission_snapshot DROP COLUMN rules_version")
+        stand.sql("DELETE FROM service_migration WHERE name='007_calculation_rules.sql'")
+        with pytest.raises(psycopg.errors.RaiseException, match="Complete existing SCORING and UNDERWRITING"):
+            migrate(stand.dsn)
+        assert stand.request("POST", f"/applications/{pending}/cancellation", 200, "other")
+        migrate(stand.dsn)
+
+        assert stand.request("GET", f"/applications/{approved}/offer", 200) == offer
+        assert stand.request("GET", doc_path, 200) == pdf
+
+
+@pytest.mark.parametrize(("income", "remove_payments", "status", "reason"), [
+    (None, True, "SYSTEM_ERROR", None),
+    (None, False, "BANK_REJECTED", "NO_CONFIRMED_INCOME"),
+    (0, False, "BANK_REJECTED", "NO_CONFIRMED_INCOME"),
+    ("-0.01", False, "SYSTEM_ERROR", None),
+])
+def test_pdn_source_validation_precedes_no_income(setup_stand, income, remove_payments, status, reason):
+    stand = setup_stand
+    with stand.serve():
+        update_scenario(stand, {"payroll_income_rub": income})
+        if remove_payments:
+            stand.sql("UPDATE stand_profile SET scenario=scenario - 'existing_payments_rub'")
         app = submit(stand)
+        process(stand, "AML", "CREDIT_REPORT")
+        view = stand.request("GET", f"/applications/{app}", 200)
+        assert view["status"] == status
+        assert view["display_reason"] == ("REFUSED" if reason else None)
+        assert stand.sql("SELECT rejection_reason_code FROM final_decision") == (
+            [{"rejection_reason_code": reason}] if reason else [])
+        assert not stand.sql("SELECT * FROM service_job")
+
+
+@pytest.mark.parametrize(("payments", "required"), [("45368.27", False), ("45378.27", True)])
+def test_pdn_notice_uses_exact_ratio(setup_stand, payments, required):
+    stand = setup_stand
+    with stand.serve():
+        update_scenario(stand, {"payroll_income_rub": "100000.00", "existing_payments_rub": payments})
+        app, offer = prepare_offer(stand)
+        assert offer["monthly_payment_minor"] == "463173"
+        assert offer["psk_annual_percent"] == "20.000006146107"
+        assert offer["psk_rub"] == "5580.70"
+        assert offer["pdn_notice_required"] is required
+        assert ("pdn_notice" in offer) is required
+        card = stand.request("GET", f"/applications/{app}", 200)
+        assert ("START_SIGNING" in card["available_actions"]) is not required
+
+
+@pytest.mark.parametrize(("payment", "psk", "approved"), [
+    (122499, "24.990000000000", True), (122500, "25.000000000000", True), (122501, "25.010000000000", False),
+])
+def test_psk_and_publication_recovery(setup_stand, monkeypatch, payment, psk, approved):
+    stand = setup_stand
+    def limit_schedule(principal, term, rate):
+        assert (principal, term, rate) == (120000, 1, calculations.MONTHLY_RATE)
+        return payment, [payment], payment - principal
+
+    # Эти потоки проверяют предел отдельно от тарифа 20% учебного продукта.
+    monkeypatch.setattr(calculations, "annuity_schedule", limit_schedule)
+    with stand.serve():
+        app = submit(stand, amount="120000", term=1)
         process(stand, "AML", "CREDIT_REPORT", "DE")
+        assert stand.sql("SELECT recommendation->>'psk_annual_percent' AS psk FROM evaluation") == [{"psk": psk}]
     with stand.serve():
         if not approved:
             assert not stand.sql("SELECT * FROM mpl_reservation")
+            assert not stand.sql("SELECT * FROM individual_terms")
+            assert stand.sql("SELECT rejection_reason_code FROM final_decision") == [
+                {"rejection_reason_code": "PSK_LIMIT_EXCEEDED"}]
             assert stand.request("GET", f"/applications/{app}/offer", 409)["code"] == "OFFER_NOT_AVAILABLE"
             return
         assert stand.request("GET", f"/applications/{app}/offer", 200)["state"] == "PREPARING"
