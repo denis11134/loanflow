@@ -6,6 +6,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from . import assessment, contracts, reconciliation, signing, store, underwriting
+from .checks import ChecksClient
 from .http import document, expand, validator
 from .store import one
 
@@ -56,10 +57,11 @@ class AbsClient:
 
 
 class Worker:
-    def __init__(self, dsn=None, clock=store.now, abs_client=None, checkpoint=no_checkpoint):
+    def __init__(self, dsn=None, clock=store.now, abs_client=None, checkpoint=no_checkpoint, checks_client=None):
         self.dsn = dsn
         self.clock = clock
         self.abs = abs_client or AbsClient()
+        self.checks = checks_client or ChecksClient()
         self.checkpoint = checkpoint
 
     def run_once(self, kind=None):
@@ -91,7 +93,7 @@ class Worker:
     def run_job(self, db, job):
         kind, resource = job["kind"], job["resource_id"]
         if kind in assessment.STAGES:
-            return assessment.run(db, job, self.clock, self.checkpoint)
+            return assessment.run(db, job, self.clock, self.checkpoint, self.checks)
         if kind in ("VERIFY", "SMS", "ATTEMPT_EXPIRY"):
             return signing.run_attempt_job(db, job, self.clock, self.checkpoint)
         if kind == "OFFER_EXPIRY":

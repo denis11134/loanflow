@@ -14,15 +14,16 @@ from reportlab.pdfgen import canvas
 
 from . import calculations
 from .calendar import holidays, offer_deadline, underwriting_deadline
+from .checks import CHECK_STAGES
 from .store import enqueue, lock_application, one, reserve_transition
 
-STAGES = ("AML", "CREDIT_REPORT", "DE", "PUBLISH")
+STAGES = ("AML", *CHECK_STAGES, "DE", "PUBLISH")
 SLA_TICK = timedelta(microseconds=1)
 log = logging.getLogger(__name__)
 
 
 def assessment_inputs(db, application_id):
-    row = one(db, """SELECT p.scenario::text AS scenario, s.requested_amount_rub,
+    row = one(db, """SELECT p.scenario::text AS scenario, a.customer_id, s.requested_amount_rub,
                             s.requested_term_months, s.rules_version
                      FROM stand_profile p JOIN application a USING (customer_id)
                      JOIN submission_snapshot s USING (application_id)
@@ -121,12 +122,26 @@ def render_terms(offer):
 def evaluate_aml(db, app, scenario, at):
     app_id = app["application_id"]
     blocked = scenario.get("aml_block", False)
-    consent = scenario.get("consent_ref") if not blocked else None
-    db.execute("""INSERT INTO evaluation (application_id,evaluated_at,aml_result,consent_ref)
-                  VALUES (%s,%s,%s,%s)""", (app_id, at, "BLOCK" if blocked else "PASS", consent))
-    if blocked or not consent:
-        finish_decision(db, app, lambda: at, reason="AML_BLOCK" if blocked else "CREDIT_REPORT_CONSENT_REQUIRED")
+    db.execute("INSERT INTO evaluation (application_id,evaluated_at,aml_result) VALUES (%s,%s,%s)",
+               (app_id, at, "BLOCK" if blocked else "PASS"))
+    if blocked:
+        finish_decision(db, app, lambda: at, reason="AML_BLOCK")
     else:
+        enqueue(db, "PASSPORT", app_id, at)
+
+
+def evaluate_passport(db, app, scenario, verdict, at):
+    app_id = app["application_id"]
+    if verdict == "INVALID":
+        finish_decision(db, app, lambda: at, reason="PASSPORT_INVALID")
+        return
+    consent = scenario.get("consent_ref")
+    if consent is not None and not isinstance(consent, str):
+        system_error(db, app_id, at)
+    elif not consent or not consent.strip():
+        finish_decision(db, app, lambda: at, reason="CREDIT_REPORT_CONSENT_REQUIRED")
+    else:
+        db.execute("UPDATE evaluation SET consent_ref=%s WHERE application_id=%s", (consent, app_id))
         enqueue(db, "CREDIT_REPORT", app_id, at)
 
 
@@ -142,43 +157,91 @@ def source_amount(value):
     return amount
 
 
-def evaluate_credit(db, app, scenario, inputs, at):
+def evaluate_credit(db, app, scenario, report, at):
     app_id = app["application_id"]
-    blocked = scenario.get("self_ban", False)
+    blocked = report["self_ban_applies"]
     db.execute("UPDATE evaluation SET self_ban_applies=%s,credit_report_ref=%s WHERE application_id=%s",
-               (blocked, scenario.get("credit_report_ref"), app_id))
+               (blocked, report.get("credit_report_ref"), app_id))
     if blocked:
         finish_decision(db, app, lambda: at, reason="SELF_BAN")
         return
     try:
         raw_income = scenario["payroll_income_rub"]
         income = None if raw_income is None else source_amount(raw_income)
-        existing = source_amount(scenario["existing_payments_rub"])
+        existing = source_amount(report["existing_payments_rub"])
     except (ArithmeticError, KeyError, ValueError):
         system_error(db, app_id, at)
         return
+    db.execute("""UPDATE evaluation SET monthly_payroll_income_rub=%s, monthly_existing_payments_rub=%s
+                  WHERE application_id=%s""", (income, existing, app_id))
     if not income:
-        db.execute("""UPDATE evaluation SET monthly_payroll_income_rub=%s, monthly_existing_payments_rub=%s
-                      WHERE application_id=%s""", (income, existing, app_id))
         finish_decision(db, app, lambda: at, reason="NO_CONFIRMED_INCOME")
-        return
+    else:
+        enqueue(db, "FRAUD", app_id, at)
 
+
+def calculate_schedule(db, app_id, inputs):
+    evaluation = one(db, """SELECT monthly_payroll_income_rub, monthly_existing_payments_rub
+                            FROM evaluation WHERE application_id=%s""", (app_id,))
+    principal = int(Fraction(inputs["requested_amount_rub"]) * 100)
+    regular, payments, interest = calculations.annuity_schedule(
+        principal, inputs["requested_term_months"], calculations.MONTHLY_RATE,
+    )
+    requested = calculations.rubles_from_cents(regular)
+    exact_pdn = calculations.pdn_percent(evaluation["monthly_payroll_income_rub"],
+                                         evaluation["monthly_existing_payments_rub"], requested)
+    with localcontext(prec=38):
+        pdn = Decimal(exact_pdn.numerator) / Decimal(exact_pdn.denominator)
+    db.execute("""UPDATE evaluation SET requested_monthly_payment_rub=%s,pdn_percent=%s
+                  WHERE application_id=%s""", (requested, pdn, app_id))
+    return requested, {"payments": payments, "interest": interest}
+
+
+def evaluate_fraud(db, app, scenario, inputs, verdict, at, clock):
+    app_id = app["application_id"]
     try:
-        principal = int(Fraction(inputs["requested_amount_rub"]) * 100)
-        regular, payments, interest = calculations.annuity_schedule(
-            principal, inputs["requested_term_months"], calculations.MONTHLY_RATE,
-        )
-        requested = calculations.rubles_from_cents(regular)
-        exact_pdn = calculations.pdn_percent(income, existing, requested)
+        regular, schedule = calculate_schedule(db, app_id, inputs)
     except (ArithmeticError, ValueError):
         system_error(db, app_id, at)
         return
-    with localcontext(prec=38):
-        pdn = Decimal(exact_pdn.numerator) / Decimal(exact_pdn.denominator)
-    db.execute("""UPDATE evaluation SET monthly_payroll_income_rub=%s,monthly_existing_payments_rub=%s,
-                  requested_monthly_payment_rub=%s,pdn_percent=%s WHERE application_id=%s""",
-               (income, existing, requested, pdn, app_id))
-    enqueue(db, "DE", app_id, at, payload={"payments": payments, "interest": interest})
+    if verdict == "SUSPECTED":
+        try:
+            parameters = calculate_terms(scenario, inputs, schedule, regular)
+        except (ArithmeticError, KeyError, TypeError, ValueError):
+            system_error(db, app_id, clock())
+            return
+        db.execute("UPDATE evaluation SET recommendation=%s WHERE application_id=%s", (Jsonb(parameters), app_id))
+        enter_underwriting(db, app_id, clock())
+    else:
+        enqueue(db, "DE", app_id, at, payload=schedule)
+
+
+def calculate_terms(scenario, inputs, schedule, regular):
+    amount = inputs["requested_amount_rub"]
+    principal = int(Fraction(amount) * 100)
+    payments = schedule["payments"]
+    # В профилях, созданных до 3.3, ключи квоты находятся в offer.
+    quota = scenario if "quota_period" in scenario else scenario.get("offer", {})
+    return {
+        "amount_rub": str(amount),
+        "term_months": inputs["requested_term_months"],
+        "annual_rate_percent": str(calculations.ANNUAL_RATE_PERCENT),
+        "monthly_payment_rub": str(regular),
+        "psk_annual_percent": format(calculations.annual_psk_percent(principal, payments), "f"),
+        "psk_rub": str(calculations.rubles_from_cents(schedule["interest"])),
+        "psk_limit_exceeded": calculations.present_value_difference(
+            principal, payments, calculations.PSK_LIMIT_PERCENT,
+        ) > 0,
+        "quota_period": quota["quota_period"],
+        "quota_bucket": quota["quota_bucket"],
+    }
+
+
+def enter_underwriting(db, app_id, at):
+    deadline = underwriting_deadline(at, holidays(db))
+    db.execute("""UPDATE application SET status='UNDERWRITING',underwriting_entered_at=%s,
+                  underwriting_deadline_at=%s WHERE application_id=%s""", (at, deadline, app_id))
+    enqueue(db, "SLA", app_id, deadline + SLA_TICK)
 
 
 def evaluate_de(db, app, scenario, inputs, schedule, clock):
@@ -191,45 +254,22 @@ def evaluate_de(db, app, scenario, inputs, schedule, clock):
         pdn = calculations.pdn_percent(
             evaluation["monthly_payroll_income_rub"], evaluation["monthly_existing_payments_rub"], regular,
         )
-        amount, term = inputs["requested_amount_rub"], inputs["requested_term_months"]
-        result = calculations.scoring_result(calculations.scoring_score(pdn, term))
-        parameters = None
-        if result != "REJECTED":
-            principal = int(Fraction(amount) * 100)
-            payments = schedule["payments"]
-            # В профилях, созданных до 3.3, ключи квоты находятся в offer.
-            quota = scenario if "quota_period" in scenario else scenario.get("offer", {})
-            parameters = {
-                "amount_rub": str(amount),
-                "term_months": term,
-                "annual_rate_percent": str(calculations.ANNUAL_RATE_PERCENT),
-                "monthly_payment_rub": str(regular),
-                "psk_annual_percent": format(calculations.annual_psk_percent(principal, payments), "f"),
-                "psk_rub": str(calculations.rubles_from_cents(schedule["interest"])),
-                "psk_limit_exceeded": calculations.present_value_difference(
-                    principal, payments, calculations.PSK_LIMIT_PERCENT,
-                ) > 0,
-                "quota_period": quota["quota_period"],
-                "quota_bucket": quota["quota_bucket"],
-            }
+        result = calculations.scoring_result(calculations.scoring_score(pdn, inputs["requested_term_months"]))
+        parameters = None if result == "REJECTED" else calculate_terms(scenario, inputs, schedule, regular)
     except (ArithmeticError, KeyError, TypeError, ValueError):
         system_error(db, app_id, clock())
         return
     db.execute("UPDATE evaluation SET de_result=%s,recommendation=%s WHERE application_id=%s",
                (result, Jsonb(parameters) if parameters else None, app_id))
     if result == "MANUAL_REVIEW":
-        at = clock()
-        deadline = underwriting_deadline(at, holidays(db))
-        db.execute("""UPDATE application SET status='UNDERWRITING',underwriting_entered_at=%s,
-                      underwriting_deadline_at=%s WHERE application_id=%s""", (at, deadline, app_id))
-        enqueue(db, "SLA", app_id, deadline + SLA_TICK)
+        enter_underwriting(db, app_id, clock())
     elif result == "REJECTED":
         finish_decision(db, app, clock, reason="SCORING_BELOW_THRESHOLD")
     else:
         finish_decision(db, app, clock, parameters)
 
 
-def run(db, job, clock, checkpoint):
+def run(db, job, clock, checkpoint, checks):
     app_id = job["resource_id"]
     kind = job["kind"]
     needed = "APPROVED" if kind == "PUBLISH" else "SCORING"
@@ -237,11 +277,17 @@ def run(db, job, clock, checkpoint):
     if state["status"] != needed:
         return None
     inputs = assessment_inputs(db, app_id)
+    response = None
     if inputs is None or (kind != "PUBLISH" and inputs["rules_version"] != calculations.RULES_VERSION):
         failure = "PERMANENT"
     else:
         scenario = inputs["scenario"]
         failure = adapter_outcome(scenario, kind, job["failures"])
+        if failure == "OK" and kind in CHECK_STAGES:
+            consent = None
+            if kind == "CREDIT_REPORT":
+                consent = one(db, "SELECT consent_ref FROM evaluation WHERE application_id=%s", (app_id,))["consent_ref"]
+            failure, response = checks.call(kind, inputs["customer_id"], consent)
     audit(db, kind, app_id, clock(), job["failures"] + 1)
     offer = one(db, "SELECT * FROM offer WHERE application_id=%s", (app_id,)) if kind == "PUBLISH" else None
     pdf = None
@@ -266,8 +312,12 @@ def run(db, job, clock, checkpoint):
         system_error(db, app_id, at)
     elif kind == "AML":
         evaluate_aml(db, app, scenario, at)
+    elif kind == "PASSPORT":
+        evaluate_passport(db, app, scenario, response["verdict"], at)
     elif kind == "CREDIT_REPORT":
-        evaluate_credit(db, app, scenario, inputs, at)
+        evaluate_credit(db, app, scenario, response, at)
+    elif kind == "FRAUD":
+        evaluate_fraud(db, app, scenario, inputs, response["verdict"], at, clock)
     elif kind == "DE":
         evaluate_de(db, app, scenario, inputs, job["payload"], clock)
     else:

@@ -122,7 +122,11 @@ def routes(name, invoke, invalid, clock=store.now):
                 if name == "abs":
                     result[1].update(instruction_id=str(args["instruction_id"]))
                     result[1].pop("message")
+                elif name == "checks":
+                    result = 503, None
             status, payload = result
+            if payload is None:
+                return Response(status_code=status)
             if isinstance(payload, bytes):
                 return Response(payload, media_type="application/pdf", status_code=status)
             return JSONResponse(store.as_json(payload), status_code=status)

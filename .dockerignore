@@ -3,6 +3,7 @@
 !services/**
 !api/
 !api/*.openapi.yaml
+!api/passport.xsd
 !sql/
 !sql/001_initial_schema.sql
 **/__pycache__/

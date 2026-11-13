@@ -20,6 +20,7 @@ from reportlab.pdfbase.ttfonts import TTFError
 from api_support import document, operations, response_schema, validator
 from services.loanflow import applications, assessment, calculations
 from services.loanflow.api import create_app
+from services.loanflow.check_stubs import create_stubs
 from services.loanflow.seed import DEMO, seed
 from services.loanflow.signing import stand_code
 from services.loanflow.worker import Worker
@@ -120,7 +121,10 @@ def setup_stand(monkeypatch, tmp_path):
         dsn = psycopg.conninfo.make_conninfo(**params)
         migrate(dsn)
         migrate(dsn)
-        yield Stand(dsn, Clock(), seed(config, dsn))
+        stand = Stand(dsn, Clock(), seed(config, dsn))
+        with http_server(create_stubs(dsn)) as port:
+            monkeypatch.setenv("LOANFLOW_CHECKS_URL", f"http://127.0.0.1:{port}")
+            yield stand
 
 
 def test_submission_http_restart_and_race(setup_stand):
@@ -212,7 +216,7 @@ def prepare_offer(stand, amount=None):
         if Decimal(amount) >= 200_000:
             update_scenario(stand, {"payroll_income_rub": "80000.00"})
         app = submit(stand, amount=applications.minor(Decimal(amount)))
-    process(stand, "AML", "CREDIT_REPORT", "DE")
+    process(stand, "AML", "PASSPORT", "CREDIT_REPORT", "FRAUD", "DE")
     assert stand.request("GET", f"/applications/{app}/offer", 200)["state"] == "PREPARING"
     process(stand, "PUBLISH")
     path = f"/applications/{app}/offer"
@@ -288,9 +292,10 @@ def test_worker_recovery_retries_and_late_assessment(setup_stand):
 
 @pytest.mark.parametrize(("patch", "reason", "operations"), [
     ({"aml_block": True, "self_ban": True}, "REFUSED", ["AML"]),
-    ({"consent_ref": None}, "CREDIT_REPORT_CONSENT_REQUIRED", ["AML"]),
-    ({"self_ban": True}, "SELF_BAN", ["AML", "CREDIT_REPORT"]),
-    ({"payroll_income_rub": "40000.00"}, "REFUSED", ["AML", "CREDIT_REPORT", "DE"]),
+    ({"consent_ref": None}, "CREDIT_REPORT_CONSENT_REQUIRED", ["AML", "PASSPORT"]),
+    ({"passport_verdict": "INVALID", "consent_ref": None}, "REFUSED", ["AML", "PASSPORT"]),
+    ({"self_ban": True}, "SELF_BAN", ["AML", "PASSPORT", "CREDIT_REPORT"]),
+    ({"payroll_income_rub": "40000.00"}, "REFUSED", ["AML", "PASSPORT", "CREDIT_REPORT", "FRAUD", "DE"]),
 ])
 def test_assessment_stop_factors(setup_stand, patch, reason, operations):
     stand = setup_stand
@@ -300,6 +305,9 @@ def test_assessment_stop_factors(setup_stand, patch, reason, operations):
         process(stand, *operations)
         assert stand.request("GET", f"/applications/{app}", 200)["display_reason"] == reason
         assert [r["operation"] for r in stand.sql("SELECT operation FROM stand_adapter_call ORDER BY call_id")] == operations
+        if patch.get("passport_verdict") == "INVALID":
+            assert stand.sql("SELECT rejection_reason_code FROM final_decision") == [
+                {"rejection_reason_code": "PASSPORT_INVALID"}]
         if operations[-1] == "DE":
             assert stand.sql("SELECT rejection_reason_code FROM final_decision") == [
                 {"rejection_reason_code": "SCORING_BELOW_THRESHOLD"}]
@@ -310,7 +318,8 @@ def test_underwriting_last_quota_sla_and_weekly_report(setup_stand):
     with stand.serve():
         stand.sql("UPDATE mpl_quota SET capacity=1")
         apps = {actor: submit(stand, actor, term=37) for actor in ("mobile", "other")}
-        process(stand, "AML", "AML", "CREDIT_REPORT", "CREDIT_REPORT", "DE", "DE")
+        process(stand, "AML", "AML", "PASSPORT", "PASSPORT", "CREDIT_REPORT", "CREDIT_REPORT",
+                "FRAUD", "FRAUD", "DE", "DE")
         cards = stand.request("GET", "/underwriting/applications", 200, "underwriter")
         assert len(cards) == 2
         assert all(card["sla_deadline_at"] == "2026-11-09T05:30:00+00:00" for card in cards)
@@ -401,13 +410,15 @@ def test_pdn_source_validation_precedes_no_income(setup_stand, income, remove_pa
         if remove_payments:
             stand.sql("UPDATE stand_profile SET scenario=scenario - 'existing_payments_rub'")
         app = submit(stand)
-        process(stand, "AML", "CREDIT_REPORT")
+        process(stand, "AML", "PASSPORT", "CREDIT_REPORT")
         view = stand.request("GET", f"/applications/{app}", 200)
         assert view["status"] == status
         assert view["display_reason"] == ("REFUSED" if reason else None)
         assert stand.sql("SELECT rejection_reason_code FROM final_decision") == (
             [{"rejection_reason_code": reason}] if reason else [])
         assert not stand.sql("SELECT * FROM service_job")
+        assert stand.sql("SELECT operation FROM stand_adapter_call ORDER BY call_id") == [
+            {"operation": kind} for kind in ("AML", "PASSPORT", "CREDIT_REPORT")]
 
 
 @pytest.mark.parametrize(("payments", "required"), [("45368.27", False), ("45378.27", True)])
@@ -438,7 +449,7 @@ def test_psk_and_publication_recovery(setup_stand, monkeypatch, payment, psk, ap
     monkeypatch.setattr(calculations, "annuity_schedule", limit_schedule)
     with stand.serve():
         app = submit(stand, amount="120000", term=1)
-        process(stand, "AML", "CREDIT_REPORT", "DE")
+        process(stand, "AML", "PASSPORT", "CREDIT_REPORT", "FRAUD", "DE")
         assert stand.sql("SELECT recommendation->>'psk_annual_percent' AS psk FROM evaluation") == [{"psk": psk}]
     with stand.serve():
         if not approved:
@@ -564,7 +575,7 @@ def test_failed_publication_releases_reserve(setup_stand, faults, steps):
     with stand.serve():
         update_scenario(stand, {"faults": {"PUBLISH": faults}})
         app = submit(stand)
-        process(stand, "AML", "CREDIT_REPORT", "DE")
+        process(stand, "AML", "PASSPORT", "CREDIT_REPORT", "FRAUD", "DE")
         for n in range(steps):
             process(stand, "PUBLISH")
             stand.clock.at += timedelta(seconds=1 if n == 0 else 3)
@@ -594,7 +605,7 @@ def test_publication_handles_generator_exceptions(setup_stand, monkeypatch, erro
     with stand.serve():
         app = submit(stand)
         path = f"/applications/{app}"
-        process(stand, "AML", "CREDIT_REPORT", "DE")
+        process(stand, "AML", "PASSPORT", "CREDIT_REPORT", "FRAUD", "DE")
         assert stand.request("GET", path, 200)["offer_availability"] == "PREPARING"
         assert_reserve(stand, "HELD")
 

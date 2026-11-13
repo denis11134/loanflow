@@ -8,6 +8,7 @@ x-loanflow: &loanflow
     LOANFLOW_SECRET: ${LOANFLOW_SECRET:?generate a local stand secret}
     LOANFLOW_ABS_TOKEN: ${LOANFLOW_ABS_TOKEN:?generate a local ABS token}
     LOANFLOW_ABS_URL: http://abs:8001
+    LOANFLOW_CHECKS_URL: http://checks:8002
 
 services:
   postgres:
@@ -63,11 +64,25 @@ services:
       timeout: 3s
       retries: 20
 
+  checks:
+    <<: *loanflow
+    command: ["uvicorn", "services.loanflow.check_stubs:app", "--host", "0.0.0.0", "--port", "8002", "--no-access-log"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8002/openapi.json', timeout=2).close()"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
   worker:
     <<: *loanflow
     command: ["python", "-m", "services.loanflow.worker"]
     depends_on:
       abs:
+        condition: service_healthy
+      checks:
         condition: service_healthy
 
 volumes:

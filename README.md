@@ -7,9 +7,9 @@
 ## Фактическое состояние
 
 В репозитории есть бизнес-документы, статусная модель v3, требования UC-01–UC-07,
-логическая и физическая модели, два OpenAPI-контракта, DDL PostgreSQL, SQL-практикум
-из пяти заданий, браузерное демо и сервисы учебного стенда. LoanFlow и учебная АБС
-работают на FastAPI и PostgreSQL. Фоновые задачи выполняет отдельный воркер.
+логическая и физическая модели, OpenAPI-контракты, DDL PostgreSQL, SQL-практикум
+из пяти заданий, браузерное демо и сервисы учебного стенда. LoanFlow, АБС и учебные
+проверки КБКИ, паспорта и антифрода работают на FastAPI и PostgreSQL. Фоновые задачи выполняет отдельный воркер.
 
 Статусная модель, требования 1.6 и логическая модель помечены согласованными **для учебного стенда**.
 BRD v4 остаётся черновиком на согласовании, глоссарий v4 — на ревью. Для текущей итерации
@@ -23,6 +23,8 @@ BRD v4 остаётся черновиком на согласовании, гл
 | [docs/](docs/index.md) | Сайт MkDocs: бизнес-контекст, процессы, требования, данные, API, интеграции |
 | [api/loanflow.openapi.yaml](api/loanflow.openapi.yaml) | 29 операций МП и рабочих мест |
 | [api/abs.openapi.yaml](api/abs.openapi.yaml) | 3 операции учебной АБС |
+| [api/checks.openapi.yaml](api/checks.openapi.yaml) | REST КБКИ и антифрода |
+| [api/passport.xsd](api/passport.xsd) | Элементы операции SOAP 1.1 для проверки паспорта |
 | [sql/001_initial_schema.sql](sql/001_initial_schema.sql) | Первоначальная схема из 20 таблиц |
 | [sql/001_initial_schema_test.sql](sql/001_initial_schema_test.sql) | Штатная проверка ограничений, 35 ожидаемых отклонений |
 | [sql/practicum/](sql/practicum/README.md) | Синтетические фикстуры, пять существующих решений и описание проверки |
@@ -56,7 +58,7 @@ docker compose build
 docker compose up -d --wait postgres
 docker compose run --rm migrate
 docker compose run --rm seed
-docker compose up -d api abs worker
+docker compose up -d api abs checks worker
 ```
 
 Сервис принимает запросы на `127.0.0.1:8000`. Seed создаёт учебные токены всех шести ролей
@@ -72,8 +74,9 @@ SHA-256 ИУ с PDF, полученным через HTTP. Для повторн
 заявку из `APPROVED` с помощью её идентификатора, выведенного скриптом.
 
 Для запуска без Compose установите пакет `fonts-dejavu-core` и задайте `LOANFLOW_DSN` для чистого PostgreSQL 18,
-`LOANFLOW_SECRET`, `LOANFLOW_ABS_TOKEN` и `LOANFLOW_ABS_URL=http://127.0.0.1:8001`.
-Из корня репозитория выполните миграции и загрузку данных. Запустите три процесса
+`LOANFLOW_SECRET`, `LOANFLOW_ABS_TOKEN`, `LOANFLOW_ABS_URL=http://127.0.0.1:8001` и
+`LOANFLOW_CHECKS_URL=http://127.0.0.1:8002`.
+Из корня репозитория выполните миграции и загрузку данных. Запустите четыре процесса
 в отдельных терминалах с теми же переменными.
 
 ```bash
@@ -83,6 +86,7 @@ python3.12 -m venv .venv
 .venv/bin/python -m services.loanflow.seed seed --tokens .cache/loanflow/tokens.json
 .venv/bin/uvicorn services.loanflow.api:app --port 8000 --no-access-log
 .venv/bin/uvicorn services.loanflow.abs:app --port 8001 --no-access-log
+.venv/bin/uvicorn services.loanflow.check_stubs:app --port 8002 --no-access-log
 .venv/bin/python -m services.loanflow.worker
 ```
 
@@ -95,9 +99,17 @@ python3.12 -m venv .venv
 По умолчанию АБС оставляет принятое распоряжение в `PENDING`. Проведение и
 закрытие в обоих порядках показаны в [HTTP-тестах АБС](tests/test_service_abs.py).
 
+Заглушки проверок читают учебные ответы из сценария клиента по UUID. По умолчанию
+паспорт даёт `VALID`, антифрод даёт `CLEAR`, самозапрета нет. Для других веток задайте
+`passport_verdict: INVALID`, `fraud_verdict: SUSPECTED` или `self_ban: true` в сценарии.
+Запросы и порядок вызовов описаны в [главе 4.2](docs/06-integrations/4.2-field-mappings.md).
+
 При обновлении до 3.3 завершите оценку и ручное рассмотрение старой версией. Перед миграцией
 остановите приём новых подач и проверьте, что в `SCORING` и `UNDERWRITING` нет заявок.
 Миграция 007 проверяет это условие. Сохранённые Предложения и экземпляры ИУ используются при последующих чтениях.
+
+При обновлении уже работающего стенда с 3.3 остановите API и воркер на время миграции 008.
+Заявки с незавершённой оценкой, уже прошедшие AML, продолжат оценку с проверки паспорта.
 
 ## Установка и проверка
 

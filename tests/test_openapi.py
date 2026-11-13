@@ -6,7 +6,7 @@ from jsonschema import Draft4Validator
 from api_support import ROOT, document, expanded, operations, resolve
 
 
-@pytest.mark.parametrize('name,expected_count', [('loanflow', 29), ('abs', 3)])
+@pytest.mark.parametrize('name,expected_count', [('loanflow', 29), ('abs', 3), ('checks', 2)])
 def test_openapi_structure(name, expected_count):
     doc = document(name)
     meta = json.loads((ROOT / 'tests/schemas/openapi-3.0-2024-10-18.json').read_text())

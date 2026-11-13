@@ -20,6 +20,8 @@ from psycopg.conninfo import make_conninfo
 from services.loanflow import assessment, calculations, signing
 from services.loanflow.abs import create_abs
 from services.loanflow.api import create_app
+from services.loanflow.check_stubs import create_stubs
+from services.loanflow.checks import ChecksClient
 from services.loanflow.seed import DEMO, seed
 from services.loanflow.store import connect, migrate, one
 from services.loanflow.worker import AbsClient, Worker
@@ -60,16 +62,16 @@ def build_scenarios(path):
 
 
 @contextmanager
-def fixture_worker(dsn, abs_port, sms_code):
-    evaluate_credit = assessment.evaluate_credit
+def fixture_worker(dsn, abs_port, checks_port, sms_code):
+    calculate_schedule = assessment.calculate_schedule
 
-    def evaluate_with_fixture(db, app, scenario, inputs, at):
-        payment = scenario.get("acceptance_payment_minor")
+    def calculate_with_fixture(db, app_id, inputs):
+        payment = inputs["scenario"].get("acceptance_payment_minor")
         if payment is None:
-            return evaluate_credit(db, app, scenario, inputs, at)
+            return calculate_schedule(db, app_id, inputs)
         assert inputs["requested_amount_rub"] == 1200 and inputs["requested_term_months"] == 1
         with patch.object(calculations, "annuity_schedule", return_value=(payment, [payment], payment - 120000)):
-            return evaluate_credit(db, app, scenario, inputs, at)
+            return calculate_schedule(db, app_id, inputs)
 
     def enable_posting(name, instruction):
         if name == "before_started_commit":
@@ -78,14 +80,15 @@ def fixture_worker(dsn, abs_port, sms_code):
                            (instruction["instruction_id"],))
 
     stop = Event()
-    worker = Worker(dsn, abs_client=AbsClient(f"http://127.0.0.1:{abs_port}"), checkpoint=enable_posting)
+    worker = Worker(dsn, abs_client=AbsClient(f"http://127.0.0.1:{abs_port}"), checkpoint=enable_posting,
+                    checks_client=ChecksClient(f"http://127.0.0.1:{checks_port}"))
 
     def run():
         while not stop.is_set():
             if not worker.run_once():
                 stop.wait(0.1)
 
-    with patch.object(assessment, "evaluate_credit", evaluate_with_fixture), \
+    with patch.object(assessment, "calculate_schedule", calculate_with_fixture), \
             patch.object(signing, "stand_code", return_value=sms_code):
         thread = Thread(target=run, daemon=True)
         thread.start()
@@ -190,7 +193,8 @@ def main():
         with patch.dict(os.environ, secrets):
             tokens = seed(scenarios, dsn)
             with http_server(create_abs(dsn)) as abs_port, http_server(create_app(dsn)) as api_port, \
-                    fixture_worker(dsn, abs_port, sms_code):
+                    http_server(create_stubs(dsn)) as checks_port, \
+                    fixture_worker(dsn, abs_port, checks_port, sms_code):
                 base_url = f"http://127.0.0.1:{api_port}"
                 environment = work / "local.postman_environment.json"
                 prepare_environment(environment, tokens, base_url, sms_code)
