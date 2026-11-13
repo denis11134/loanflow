@@ -1,0 +1,116 @@
+openapi: 3.0.3
+info:
+  title: LoanFlow · Учебные проверки КБКИ и антифрода
+  version: 1.0.0
+paths:
+  /credit-reports:
+    post:
+      operationId: getTrainingCreditReport
+      summary: Получить кредитный отчёт и признак самозапрета
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [customer_id, consent_ref]
+              properties:
+                customer_id:
+                  $ref: '#/components/schemas/CustomerId'
+                consent_ref:
+                  $ref: '#/components/schemas/Reference'
+      responses:
+        '200':
+          description: Результат проверки
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SelfBanApplies'
+                  - $ref: '#/components/schemas/CreditReport'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '404':
+          $ref: '#/components/responses/UnknownCustomer'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /fraud-checks:
+    post:
+      operationId: checkTrainingFraud
+      summary: Получить вердикт антифрода
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [customer_id]
+              properties:
+                customer_id:
+                  $ref: '#/components/schemas/CustomerId'
+      responses:
+        '200':
+          description: Вердикт антифрода
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [customer_id, verdict]
+                properties:
+                  customer_id:
+                    $ref: '#/components/schemas/CustomerId'
+                  verdict:
+                    type: string
+                    enum: [CLEAR, SUSPECTED]
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '404':
+          $ref: '#/components/responses/UnknownCustomer'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+components:
+  schemas:
+    CustomerId:
+      type: string
+      format: uuid
+      description: Синтетический идентификатор клиента стенда.
+    Reference:
+      type: string
+      pattern: '\S'
+      description: Непустая ссылка стенда, содержащая хотя бы один непробельный символ.
+    SelfBanApplies:
+      type: object
+      additionalProperties: false
+      required: [customer_id, self_ban_applies]
+      properties:
+        customer_id:
+          $ref: '#/components/schemas/CustomerId'
+        self_ban_applies:
+          type: boolean
+          enum: [true]
+    CreditReport:
+      type: object
+      additionalProperties: false
+      required: [customer_id, self_ban_applies, credit_report_ref, existing_payments_rub]
+      properties:
+        customer_id:
+          $ref: '#/components/schemas/CustomerId'
+        self_ban_applies:
+          type: boolean
+          enum: [false]
+        credit_report_ref:
+          $ref: '#/components/schemas/Reference'
+        existing_payments_rub:
+          type: string
+          pattern: '^[0-9]+\.[0-9]{2}(?![\s\S])'
+          description: Текущие платежи в рублях за месяц с точностью до копейки. Ноль передаётся как 0.00.
+  responses:
+    InvalidRequest:
+      description: Некорректный запрос. Постоянная техническая ошибка интеграции.
+    UnknownCustomer:
+      description: Клиент отсутствует в тестовом наборе сервиса. Постоянная техническая ошибка.
+    Unavailable:
+      description: Временная недоступность сервиса. Применяются повторы.
