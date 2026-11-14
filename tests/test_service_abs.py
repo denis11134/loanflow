@@ -6,12 +6,12 @@ import threading
 
 import pytest
 
-from services.loanflow import reconciliation
+from services.loanflow import assessment, reconciliation
 from services.loanflow.abs import create_abs, post_pending
-from services.loanflow.store import connect
+from services.loanflow.store import connect, enqueue
 from services.loanflow.worker import AbsClient
-from test_service import (assert_reserve, crash_at, http_server, pause_at, process, setup_stand,
-                          signed_contract, worker)
+from test_service import (SimulatedProcessStop, assert_reserve, crash_at, http_server, pause_at, process, setup_stand,
+                          signed_contract, submit, update_scenario, worker)
 
 pytestmark = pytest.mark.service
 
@@ -47,6 +47,45 @@ def read(stand, path, sequence):
     return stand.request("GET", f"{path}/reads/{sequence}", 200, "reconciliation")["result"]
 
 
+def test_failed_job_does_not_block_application_timer_or_send(setup_stand, monkeypatch):
+    stand = setup_stand
+    with stand.serve(), abs_server(stand, monkeypatch) as client:
+        contract = signed_contract(stand, "49999.00")
+        instruction = instruction_id(stand)
+        abs_control(stand, instruction, "SEND", "AUTO_POST")
+        broken = uuid4()
+        with connect(stand.dsn) as db:
+            enqueue(db, "AML", broken, stand.clock() - timedelta(seconds=1))
+        update_scenario(stand, {"aml_block": True}, "other")
+        healthy = submit(stand, "other")
+
+        instance = worker(stand, abs_client=client)
+        run_job = instance.run_job
+
+        def fail_first(db, job):
+            if job["resource_id"] == broken:
+                assessment.audit(db, job["kind"], broken, stand.clock())
+                db.execute("SELECT 1 / 0")
+            return run_job(db, job)
+
+        monkeypatch.setattr(instance, "run_job", fail_first)
+        assert instance.run_once()
+        assert stand.request("GET", f"/applications/{healthy}", 200, "other")["status"] == "BANK_REJECTED"
+        assert not stand.sql("SELECT 1 FROM stand_adapter_call WHERE resource_id=%s", (broken,))
+        delayed, = stand.sql("SELECT failures,run_at FROM service_job WHERE resource_id=%s", (broken,))
+        assert delayed["failures"] == 0 and delayed["run_at"] > stand.clock()
+
+        stand.clock.at += timedelta(minutes=5)
+        assert stand.sql("SELECT 1 FROM service_job WHERE kind='ATTEMPT_EXPIRY'")
+        assert instance.run_once()
+        assert not stand.sql("SELECT 1 FROM service_job WHERE kind='ATTEMPT_EXPIRY'")
+        assert not stand.sql("SELECT 1 FROM stand_adapter_call WHERE resource_id=%s", (broken,))
+
+        assert instance.run_once()
+        assert calls(stand, instruction, "SEND") == 1
+        assert stand.request("GET", f"/contracts/{contract}", 200)["status"] == "DISBURSED"
+
+
 @pytest.mark.parametrize(("checkpoint", "expected_calls", "state"), [
     ("before_started_commit", 1, "PENDING"),
     ("after_started_commit", 0, "NOT_FOUND"),
@@ -57,7 +96,7 @@ def test_outbox_crash_boundaries(setup_stand, monkeypatch, checkpoint, expected_
     with stand.serve(), abs_server(stand, monkeypatch) as client:
         signed_contract(stand, "49999.00")
         instruction = instruction_id(stand)
-        with pytest.raises(RuntimeError, match="simulated process stop"):
+        with pytest.raises(SimulatedProcessStop):
             worker(stand, abs_client=client, checkpoint=crash_at(checkpoint)).run_once("SEND")
         restarted = worker(stand, abs_client=client)
         assert restarted.run_once("SEND") == (checkpoint == "before_started_commit")
@@ -102,12 +141,12 @@ def test_close_before_send_and_restore_original_read(setup_stand, monkeypatch):
     with stand.serve(), abs_server(stand, monkeypatch) as client:
         contract = signed_contract(stand, "49999.00")
         instruction = instruction_id(stand)
-        with pytest.raises(RuntimeError, match="simulated process stop"):
+        with pytest.raises(SimulatedProcessStop):
             worker(stand, abs_client=client, checkpoint=crash_at("after_started_commit")).run_once("SEND")
         path = f"/reconciliation/instructions/{instruction}"
         key = uuid4()
         receipt = register(stand, path, key)
-        with pytest.raises(RuntimeError, match="simulated process stop"):
+        with pytest.raises(SimulatedProcessStop):
             worker(stand, abs_client=client, checkpoint=crash_at("after_read")).run_once("ABS_READ")
         assert read(stand, path, 1) == "WAITING"
         assert register(stand, path, key) == receipt
@@ -255,16 +294,23 @@ def test_posted_wrong_correlation_does_not_change_reserve(setup_stand, monkeypat
 
 def test_final_apply_rollback_recovers_by_read(setup_stand, monkeypatch):
     stand = setup_stand
+
+    def fail_before_commit(name, _):
+        if name == "before_abs_result_commit":
+            raise RuntimeError("failed to apply ABS result")
+
     with stand.serve(), abs_server(stand, monkeypatch) as client:
         contract = signed_contract(stand, "49999.00")
         instruction = instruction_id(stand)
         abs_control(stand, instruction, "SEND", "AUTO_POST")
-        with pytest.raises(RuntimeError, match="simulated process stop"):
-            worker(stand, abs_client=client, checkpoint=crash_at("before_abs_result_commit")).run_once("SEND")
+        instance = process(stand, "SEND", abs_client=client, checkpoint=fail_before_commit)
+        assert not instance.run_once("SEND")
         assert stand.request("GET", f"/contracts/{contract}", 200)["status"] == "DISBURSEMENT_PROCESSING"
         assert_reserve(stand, "HELD")
         assert stand.sql("SELECT state FROM disbursement_outbox") == [{"state": "STARTED"}]
         assert not stand.sql("SELECT * FROM abs_final_result")
+        queue = stand.request("GET", "/reconciliation/instructions", 200, "reconciliation")
+        assert [row["instruction_id"] for row in queue] == [str(instruction)]
         path = f"/reconciliation/instructions/{instruction}"
         register(stand, path)
         process(stand, "ABS_READ", abs_client=client)
@@ -356,7 +402,7 @@ def test_close_job_recovers_before_first_call_and_read_times_out(setup_stand, mo
         register(stand, path)
         process(stand, "ABS_READ", abs_client=client)
         stand.request("PUT", path + "/closure", 202, "reconciliation")
-        with pytest.raises(RuntimeError, match="simulated process stop"):
+        with pytest.raises(SimulatedProcessStop):
             worker(stand, abs_client=client, checkpoint=crash_at("before_job")).run_once("ABS_CLOSE")
         assert calls(stand, instruction, "CLOSE") == 0
         assert len(stand.sql("SELECT * FROM abs_close_command")) == 1

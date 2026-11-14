@@ -1,6 +1,8 @@
 import json
 import logging
 import os
+from datetime import timedelta
+from http.client import HTTPException
 from time import sleep
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -11,6 +13,7 @@ from .http import document, expand, validator
 from .store import one
 
 log = logging.getLogger("loanflow.worker")
+UNEXPECTED_JOB_RETRY_DELAY = timedelta(seconds=1)
 
 
 def no_checkpoint(*_):
@@ -48,7 +51,7 @@ class AbsClient:
                 response = exc
             with response:
                 status, payload = response.status, json.load(response)
-        except (OSError, URLError, ValueError):
+        except (OSError, URLError, HTTPException, ValueError):
             return None
         check = self.validators.get((kind, status))
         if check is None or not isinstance(payload, dict):
@@ -78,13 +81,26 @@ class Worker:
                 if job is None:
                     db.execute("SELECT pg_advisory_unlock(%s)", (job_id,))
                     continue
-                self.checkpoint("before_job", job)
-                next_run = self.run_job(db, job)
-                if next_run is None:
-                    db.execute("DELETE FROM service_job WHERE job_id=%s", (job_id,))
-                else:
-                    db.execute("UPDATE service_job SET run_at=%s,failures=failures+1 WHERE job_id=%s",
-                               (next_run, job_id))
+                try:
+                    self.checkpoint("before_job", job)
+                    next_run = self.run_job(db, job)
+                    if next_run is None:
+                        db.execute("DELETE FROM service_job WHERE job_id=%s", (job_id,))
+                    else:
+                        db.execute("UPDATE service_job SET run_at=%s,failures=failures+1 WHERE job_id=%s",
+                                   (next_run, job_id))
+                    db.commit()
+                except Exception as exc:
+                    db.rollback()
+                    # Сдвигаем задание в отдельной транзакции под той же блокировкой.
+                    # Счётчик failures относится к повторам, которые назначает обработчик.
+                    db.execute("UPDATE service_job SET run_at=%s WHERE job_id=%s",
+                               (self.clock() + UNEXPECTED_JOB_RETRY_DELAY, job_id))
+                    db.commit()
+                    db.execute("SELECT pg_advisory_unlock(%s)", (job_id,))
+                    log.error("job_processing_failed job_id=%s kind=%s category=%s sqlstate=%s",
+                              job_id, job["kind"], type(exc).__name__, getattr(exc, "sqlstate", None))
+                    continue
                 return True
             if kind in (None, "SEND"):
                 return self.send_one(db)
@@ -120,13 +136,20 @@ class Worker:
             return False
         self.checkpoint("before_started_commit", row)
         db.commit()
-        self.checkpoint("after_started_commit", row)
         instruction_id = row["instruction_id"]
-        response = self.abs.call("SEND", instruction_id, 2,
-                                 {field: row[field] for field in ("account_ref", "amount_minor", "currency")})
-        self.checkpoint("after_send", row)
-        reconciliation.handle_response(db, instruction_id, "SEND", response, self.clock)
-        self.checkpoint("before_abs_result_commit", row)
+        try:
+            self.checkpoint("after_started_commit", row)
+            response = self.abs.call("SEND", instruction_id, 2,
+                                     {field: row[field] for field in ("account_ref", "amount_minor", "currency")})
+            self.checkpoint("after_send", row)
+            reconciliation.handle_response(db, instruction_id, "SEND", response, self.clock)
+            self.checkpoint("before_abs_result_commit", row)
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            # Зафиксированный STARTED уже помещает распоряжение в очередь ручной сверки.
+            log.error("abs_send_failed instruction_id=%s category=%s sqlstate=%s",
+                      instruction_id, type(exc).__name__, getattr(exc, "sqlstate", None))
         return True
 
     def reconcile(self, db, job):

@@ -179,10 +179,14 @@ def pause_at(name, entered, proceed):
     return checkpoint
 
 
+class SimulatedProcessStop(BaseException):
+    pass
+
+
 def crash_at(name):
     def checkpoint(current, *_):
         if current == name:
-            raise RuntimeError("simulated process stop")
+            raise SimulatedProcessStop
     return checkpoint
 
 
@@ -311,6 +315,73 @@ def test_assessment_stop_factors(setup_stand, patch, reason, operations):
         if operations[-1] == "DE":
             assert stand.sql("SELECT rejection_reason_code FROM final_decision") == [
                 {"rejection_reason_code": "SCORING_BELOW_THRESHOLD"}]
+
+
+@pytest.mark.parametrize("legacy", [False, True], ids=["current", "legacy"])
+def test_seed_rejects_missing_quota_without_partial_load(setup_stand, tmp_path, legacy):
+    stand = setup_stand
+    data = json.loads(DEMO.read_text())
+    valid = data["customers"]["mobile"]
+    valid.update(customer_id=str(uuid4()), profile_ref="new-profile")
+    missing_quota = {"quota_period": "missing-period", "quota_bucket": "missing-bucket"}
+    data["customers"]["invalid"] = {
+        **valid, "customer_id": str(uuid4()), "profile_ref": "invalid-profile",
+        "scenario": {"offer": missing_quota} if legacy else missing_quota,
+    }
+    data["holidays"] = ["2026-11-12"]
+    data["quotas"] = [{"period": "new-period", "bucket": "standard", "capacity": 1}]
+    config = tmp_path / "invalid-scenarios.json"
+    config.write_text(json.dumps(data))
+
+    tables = ("customer", "stand_profile", "stand_session", "stand_holiday", "mpl_quota")
+    before = [stand.sql(f"SELECT count(*) FROM {table}") for table in tables]
+    with pytest.raises(ValueError, match="missing-period.*missing-bucket"):
+        seed(config, stand.dsn)
+    assert [stand.sql(f"SELECT count(*) FROM {table}") for table in tables] == before
+
+
+@pytest.mark.parametrize("manual", [False, True], ids=["automatic", "manual"])
+def test_missing_quota_is_application_system_error(setup_stand, manual):
+    stand = setup_stand
+    with stand.serve():
+        stand.sql("INSERT INTO mpl_quota VALUES (%s,'removed','standard',1)", (uuid4(),))
+        update_scenario(stand, {"quota_period": "removed"})
+        app = submit(stand, term=37 if manual else 12)
+        other = submit(stand, "other")
+        process(stand, "AML", "AML", "PASSPORT", "PASSPORT", "CREDIT_REPORT", "CREDIT_REPORT",
+                "FRAUD", "FRAUD")
+        if manual:
+            process(stand, "DE")
+            assert stand.request("GET", f"/applications/{app}", 200)["status"] == "UNDERWRITING"
+        stand.sql("DELETE FROM mpl_quota WHERE period_key='removed'")
+        if manual:
+            path = f"/underwriting/applications/{app}/decision"
+            key = uuid4()
+            body = {"command": "APPROVE"}
+            response = stand.request("POST", path, 503, "underwriter", body, key)
+            assert response["code"] == "SERVICE_UNAVAILABLE"
+            assert stand.request("POST", path, 503, "underwriter", body, key) == response
+            assert stand.sql("SELECT underwriting_exited_at FROM application WHERE application_id=%s", (app,)) == [
+                {"underwriting_exited_at": stand.clock()}]
+        else:
+            process(stand, "DE")
+        process(stand, "DE", "PUBLISH")
+        assert stand.request("GET", f"/applications/{app}", 200)["status"] == "SYSTEM_ERROR"
+        assert stand.request("GET", f"/applications/{other}", 200, "other")["status"] == "APPROVED"
+        assert not stand.sql("SELECT 1 FROM final_decision WHERE application_id=%s", (app,))
+        assert not stand.sql("SELECT 1 FROM offer WHERE application_id=%s", (app,))
+
+
+def test_exhausted_quota_is_bank_rejection(setup_stand):
+    stand = setup_stand
+    with stand.serve():
+        stand.sql("UPDATE mpl_quota SET capacity=0")
+        app = submit(stand)
+        process(stand, "AML", "PASSPORT", "CREDIT_REPORT", "FRAUD", "DE")
+        assert stand.request("GET", f"/applications/{app}", 200)["status"] == "BANK_REJECTED"
+        assert stand.sql("SELECT rejection_reason_code FROM final_decision WHERE application_id=%s", (app,)) == [
+            {"rejection_reason_code": "MPL_QUOTA_EXHAUSTED"}]
+        assert not stand.sql("SELECT 1 FROM mpl_reservation")
 
 
 def test_underwriting_last_quota_sla_and_weekly_report(setup_stand):
@@ -460,7 +531,7 @@ def test_psk_and_publication_recovery(setup_stand, monkeypatch, payment, psk, ap
             assert stand.request("GET", f"/applications/{app}/offer", 409)["code"] == "OFFER_NOT_AVAILABLE"
             return
         assert stand.request("GET", f"/applications/{app}/offer", 200)["state"] == "PREPARING"
-        with pytest.raises(RuntimeError, match="simulated process stop"):
+        with pytest.raises(SimulatedProcessStop):
             worker(stand, checkpoint=crash_at("after_publish")).run_once("PUBLISH")
         assert not stand.sql("SELECT * FROM individual_terms")
         process(stand, "PUBLISH")
@@ -683,7 +754,7 @@ def test_equal_deadlines_and_expired_verification_on_restart(setup_stand, offset
         path, attempt = start_attempt(stand, app, offer)
         assert attempt["expires_at"] == attempt["offer_expires_at"]
         verify(stand, path, attempt)
-        with pytest.raises(RuntimeError, match="simulated process stop"):
+        with pytest.raises(SimulatedProcessStop):
             worker(stand, checkpoint=crash_at("before_sign_commit")).run_once("VERIFY")
         assert not stand.sql("SELECT * FROM contract")
         stand.clock.at += timedelta(minutes=5, seconds=offset)

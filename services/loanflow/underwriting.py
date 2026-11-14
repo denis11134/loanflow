@@ -48,7 +48,11 @@ def record_manual_decision(ctx, application_id):
         if not recommendation or not recommendation["recommendation"]:
             raise ApiError(503, "SERVICE_UNAVAILABLE")
         params = recommendation["recommendation"]
-    return 200, finish_decision(db, app, ctx.clock, params, reason, ctx.actor["principal"], command)
+    receipt = finish_decision(db, app, ctx.clock, params, reason, ctx.actor["principal"], command)
+    if receipt is None:
+        # Ответ проходит штатный коммит, чтобы сохранить переход в SYSTEM_ERROR.
+        return 503, ApiError(503, "SERVICE_UNAVAILABLE").body
+    return 200, receipt
 
 
 def escalate(db, app_id, clock):

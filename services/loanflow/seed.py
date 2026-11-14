@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 from psycopg.types.json import Jsonb
 
-from .store import ROOT, connect, digest, lock_customer, migrate
+from .store import ROOT, connect, digest, lock_customer, migrate, one, quota_reference
 
 DEMO = ROOT / "services/scenarios.json"
 
@@ -43,6 +43,12 @@ def seed(path=DEMO, dsn=None):
             db.execute("""INSERT INTO mpl_quota VALUES (%s,%s,%s,%s)
                           ON CONFLICT (period_key,bucket_code) DO NOTHING""",
                        (uuid4(), quota["period"], quota["bucket"], quota["capacity"]))
+        for name, item in data["customers"].items():
+            reference = quota_reference(item.get("scenario", {}))
+            if reference and one(db, """SELECT quota_id FROM mpl_quota WHERE period_key=%s AND bucket_code=%s
+                                        FOR KEY SHARE""", reference) is None:
+                period, bucket = reference
+                raise ValueError(f"Missing stand quota for customer {name!r}: period={period!r}, bucket={bucket!r}")
     return tokens
 
 

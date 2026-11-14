@@ -15,7 +15,7 @@ from reportlab.pdfgen import canvas
 from . import calculations
 from .calendar import holidays, offer_deadline, underwriting_deadline
 from .checks import CHECK_STAGES
-from .store import enqueue, lock_application, one, reserve_transition
+from .store import enqueue, lock_application, one, quota_reference, reserve_transition
 
 STAGES = ("AML", *CHECK_STAGES, "DE", "PUBLISH")
 SLA_TICK = timedelta(microseconds=1)
@@ -58,7 +58,8 @@ def finish_decision(db, app, clock, parameters=None, reason=None, operator=None,
             quota = one(db, """SELECT * FROM mpl_quota WHERE period_key=%s AND bucket_code=%s FOR UPDATE""",
                         (parameters["quota_period"], parameters["quota_bucket"]))
             if quota is None:
-                raise RuntimeError("Missing stand quota")
+                system_error(db, app_id, clock())
+                return None
             allocated = one(db, """SELECT count(*) AS used FROM mpl_reservation
                                    WHERE quota_id=%s AND state IN ('HELD','CONSUMED')""", (quota["quota_id"],))
             if allocated["used"] >= quota["capacity"]:
@@ -147,7 +148,9 @@ def evaluate_passport(db, app, scenario, verdict, at):
 
 def system_error(db, app_id, at):
     reserve_transition(db, app_id, "RELEASED", at)
-    db.execute("UPDATE application SET status='SYSTEM_ERROR' WHERE application_id=%s", (app_id,))
+    db.execute("""UPDATE application SET status='SYSTEM_ERROR', underwriting_exited_at=
+                  CASE WHEN status='UNDERWRITING' THEN %s ELSE underwriting_exited_at END
+                  WHERE application_id=%s""", (at, app_id))
 
 
 def source_amount(value):
@@ -220,8 +223,10 @@ def calculate_terms(scenario, inputs, schedule, regular):
     amount = inputs["requested_amount_rub"]
     principal = int(Fraction(amount) * 100)
     payments = schedule["payments"]
-    # В профилях, созданных до 3.3, ключи квоты находятся в offer.
-    quota = scenario if "quota_period" in scenario else scenario.get("offer", {})
+    reference = quota_reference(scenario)
+    if reference is None:
+        raise ValueError("Missing stand quota reference")
+    period, bucket = reference
     return {
         "amount_rub": str(amount),
         "term_months": inputs["requested_term_months"],
@@ -232,8 +237,8 @@ def calculate_terms(scenario, inputs, schedule, regular):
         "psk_limit_exceeded": calculations.present_value_difference(
             principal, payments, calculations.PSK_LIMIT_PERCENT,
         ) > 0,
-        "quota_period": quota["quota_period"],
-        "quota_bucket": quota["quota_bucket"],
+        "quota_period": period,
+        "quota_bucket": bucket,
     }
 
 

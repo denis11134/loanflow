@@ -88,6 +88,18 @@ def lock_application(db, application_id):
     return require(one(db, "SELECT * FROM application WHERE application_id=%s FOR UPDATE", (application_id,)))
 
 
+def quota_reference(scenario):
+    # В профилях до 3.3 ключи квоты находятся в offer.
+    if "quota_period" not in scenario and "quota_bucket" not in scenario:
+        scenario = scenario.get("offer") or {}
+    if "quota_period" not in scenario and "quota_bucket" not in scenario:
+        return None
+    period, bucket = scenario.get("quota_period"), scenario.get("quota_bucket")
+    if not isinstance(period, str) or not isinstance(bucket, str):
+        raise ValueError(f"Invalid stand quota reference: period={period!r}, bucket={bucket!r}")
+    return period, bucket
+
+
 def reserve_transition(db, application_id, state, at):
     reservation = one(db, """SELECT r.offer_id, r.quota_id FROM mpl_reservation r
                              JOIN offer o USING (offer_id) WHERE o.application_id=%s""", (application_id,))
