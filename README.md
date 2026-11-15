@@ -76,6 +76,9 @@ SHA-256 ИУ с PDF, полученным через HTTP. Для повторн
 Для запуска без Compose установите пакет `fonts-dejavu-core` и задайте `LOANFLOW_DSN` для чистого PostgreSQL 18,
 `LOANFLOW_SECRET`, `LOANFLOW_ABS_TOKEN`, `LOANFLOW_ABS_URL=http://127.0.0.1:8001` и
 `LOANFLOW_CHECKS_URL=http://127.0.0.1:8002`.
+На выделенном PostgreSQL стенда установите `log_min_messages=fatal`,
+`log_min_error_statement=panic`, `log_parameter_max_length=0` и
+`log_parameter_max_length_on_error=0`, как в `compose.yaml`.
 Из корня репозитория выполните миграции и загрузку данных. Запустите четыре процесса
 в отдельных терминалах с теми же переменными.
 

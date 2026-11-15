@@ -53,12 +53,21 @@ def create_app(dsn=None, clock=store.now):
             associated = str(scope).encode()
             cipher = AESGCM(digest("accepted-response-key"))
             if existing:
-                if existing["fingerprint"] != fingerprint:
-                    raise ApiError(409, "IDEMPOTENCY_KEY_REUSED")
+                if actor["role"] == "CUSTOMER" and "application_id" in args:
+                    applications.own_application(ctx, args["application_id"], lock=True)
+                if identification is not None:
+                    row = contracts.lock_contract(db, args["contract_id"])
+                    contracts.require_contact_context(ctx, row)
                 saved = bytes(existing["response_body"])
                 result = json.loads(cipher.decrypt(saved[:12], saved[12:], associated))
-                if actor["role"] == "CUSTOMER":
-                    applications.own_application(ctx, args.get("application_id") or result["application_id"])
+                if operation["operationId"] == "createDraft":
+                    # У коллекции нет идентификатора в пути и контракт не предусматривает 404.
+                    try:
+                        applications.own_application(ctx, result["application_id"], lock=True)
+                    except ApiError as exc:
+                        raise ApiError(403, "FORBIDDEN") from exc
+                if existing["fingerprint"] != fingerprint:
+                    raise ApiError(409, "IDEMPOTENCY_KEY_REUSED")
                 return existing["response_status"], result
             status, result = handler(ctx, **args)
             nonce = token_bytes(12)

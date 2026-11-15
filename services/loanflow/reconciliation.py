@@ -159,7 +159,7 @@ def handle_response(db, instruction_id, operation, response, clock, read_seq=Non
         result = "CORRELATION_ERROR" if mismatch else (
             body.get("state") if status == 200 and valid else
             "CONFLICT" if status == 409 and valid else "TIMEOUT")
-        if result == "TIMEOUT":
+        if result in ("TIMEOUT", "CORRELATION_ERROR"):
             response_id = None
         if mismatch and operation != "READ":
             db.execute("""INSERT INTO abs_correlation_error (instruction_id,operation,mismatch_kind,observed_at)

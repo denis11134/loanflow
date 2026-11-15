@@ -33,7 +33,11 @@ def presence(db, customer_id, excluded_application=None):
 def own_application(ctx, application_id, lock=False):
     row = require(one(ctx.db, "SELECT * FROM application WHERE application_id=%s AND customer_id=%s",
                       (application_id, ctx.actor["customer_id"])))
-    return lock_application(ctx.db, application_id) if lock else row
+    if lock:
+        row = lock_application(ctx.db, application_id)
+        if row["customer_id"] != ctx.actor["customer_id"]:
+            raise ApiError(404, "NOT_FOUND")
+    return row
 
 
 def offer_row(db, application_id):

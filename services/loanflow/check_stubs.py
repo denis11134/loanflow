@@ -71,15 +71,15 @@ def create_stubs(dsn=None):
             return passport_fault("Invalid request")
         try:
             scenario = await run_in_threadpool(scenario_for, fields["customer_id"])
+            if scenario is None:
+                return passport_fault("Unknown customer")
+            verdict = scenario.get("passport_verdict", "VALID")
+            if isinstance(verdict, str):
+                fields["verdict"] = verdict
+            return Response(passport_message("CheckPassportResponse", fields), media_type=SOAP_TYPE)
         except Exception as exc:
-            log.error("passport_lookup_failed category=%s sqlstate=%s", type(exc).__name__, getattr(exc, "sqlstate", None))
+            log.error("passport_check_failed category=%s sqlstate=%s", type(exc).__name__, getattr(exc, "sqlstate", None))
             return Response(status_code=503)
-        if scenario is None:
-            return passport_fault("Unknown customer")
-        verdict = scenario.get("passport_verdict", "VALID")
-        if isinstance(verdict, str):
-            fields["verdict"] = verdict
-        return Response(passport_message("CheckPassportResponse", fields), media_type=SOAP_TYPE)
 
     return app
 

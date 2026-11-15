@@ -5,11 +5,13 @@ from decimal import Decimal
 from pathlib import Path
 import os
 import re
+import shlex
 import subprocess
 import tempfile
 import uuid
 import psycopg
 import pytest
+import yaml
 from conftest import ROOT
 
 pytestmark = pytest.mark.database
@@ -32,8 +34,11 @@ def temporary_postgres():
         try:
             run('initdb', '-D', data, '-A', 'trust', '-U', 'loanflow_test', '--no-locale', '-E', 'UTF8')
             # Только отдельный Unix-сокет. Нет TCP и обращения к пользовательскому кластеру.
-            run('pg_ctl', '-D', data, '-l', base / 'postgres.log', '-o',
-                f"-k {base} -p 5432 -c listen_addresses='' -c unix_socket_permissions=0700", '-w', 'start')
+            compose = yaml.safe_load((ROOT / 'compose.yaml').read_text())
+            _, *server_options = compose['services']['postgres']['command']
+            options = ['-k', str(base), '-p', '5432', '-c', 'listen_addresses=',
+                       '-c', 'unix_socket_permissions=0700', *server_options]
+            run('pg_ctl', '-D', data, '-l', base / 'postgres.log', '-o', shlex.join(options), '-w', 'start')
             run('createdb', '-h', base, '-p', '5432', '-U', 'loanflow_test', 'checks')
             yield dict(host=str(base), port=5432, user='loanflow_test', dbname='checks'), run
         finally:

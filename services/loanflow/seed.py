@@ -60,15 +60,20 @@ def main():
     load.add_argument("--scenarios", type=Path, default=DEMO)
     load.add_argument("--tokens", type=Path, required=True)
     args = parser.parse_args()
-    if args.command == "migrate":
-        migrate()
-    else:
-        with open(args.tokens, "x", opener=lambda path, flags: os.open(path, flags, 0o600)) as output:
-            try:
-                json.dump(seed(args.scenarios), output, indent=2)
-            except BaseException:
-                args.tokens.unlink()
-                raise
+    try:
+        if args.command == "migrate":
+            migrate()
+        else:
+            with open(args.tokens, "x", opener=lambda path, flags: os.open(path, flags, 0o600)) as output:
+                try:
+                    json.dump(seed(args.scenarios), output, indent=2)
+                except BaseException:
+                    args.tokens.unlink()
+                    raise
+    except Exception as exc:
+        category = type(exc).__name__
+        sqlstate = getattr(exc, "sqlstate", None)
+        raise SystemExit(f"Команда {args.command} завершилась ошибкой ({category}, SQLSTATE={sqlstate})") from None
 
 
 if __name__ == "__main__":

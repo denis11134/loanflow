@@ -2,6 +2,7 @@ import json
 import logging
 from dataclasses import dataclass
 from functools import lru_cache
+from urllib.request import HTTPRedirectHandler
 from uuid import UUID
 
 import yaml
@@ -10,6 +11,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
 from openapi_schema_validator import OAS30Validator
 from starlette.exceptions import HTTPException
+from starlette.requests import ClientDisconnect
 
 from . import store
 from .store import ApiError, ROOT
@@ -37,6 +39,11 @@ def document(name):
 
 def validator(doc, schema):
     return OAS30Validator(expand(doc, schema), format_checker=OAS30Validator.FORMAT_CHECKER)
+
+
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 def bearer(request):
@@ -107,29 +114,30 @@ def routes(name, invoke, invalid, clock=store.now):
                     body = {}
                 if body_validator and not body_validator.is_valid(body):
                     raise ValueError
-            except (ValueError, TypeError, OverflowError):
+            except (ValueError, TypeError, OverflowError, RecursionError, ClientDisconnect):
                 return invalid(operation, args)
             try:
-                result = await run_in_threadpool(invoke, operation, request, method, path, args, key,
-                                                 identification, body, clock)
+                status, payload = await run_in_threadpool(invoke, operation, request, method, path, args, key,
+                                                          identification, body, clock)
+                if payload is None:
+                    return Response(status_code=status)
+                if isinstance(payload, bytes):
+                    return Response(payload, media_type="application/pdf", status_code=status)
+                return JSONResponse(store.as_json(payload), status_code=status)
             except ApiError as exc:
                 headers = {"WWW-Authenticate": "Bearer"} if exc.status == 401 else None
                 return JSONResponse(exc.body, status_code=exc.status, headers=headers)
             except Exception as exc:
                 log.error("operation_failed operation=%s category=%s sqlstate=%s",
                           operation["operationId"], type(exc).__name__, getattr(exc, "sqlstate", None))
-                result = 503, {"code": "SERVICE_UNAVAILABLE", "message": "SERVICE_UNAVAILABLE"}
+                if name == "checks":
+                    return Response(status_code=503)
+                error = {"code": "SERVICE_UNAVAILABLE"}
                 if name == "abs":
-                    result[1].update(instruction_id=str(args["instruction_id"]))
-                    result[1].pop("message")
-                elif name == "checks":
-                    result = 503, None
-            status, payload = result
-            if payload is None:
-                return Response(status_code=status)
-            if isinstance(payload, bytes):
-                return Response(payload, media_type="application/pdf", status_code=status)
-            return JSONResponse(store.as_json(payload), status_code=status)
+                    error["instruction_id"] = str(args["instruction_id"])
+                else:
+                    error["message"] = "SERVICE_UNAVAILABLE"
+                return JSONResponse(error, status_code=503)
 
         return handle
 

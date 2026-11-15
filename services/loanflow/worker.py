@@ -5,11 +5,11 @@ from datetime import timedelta
 from http.client import HTTPException
 from time import sleep
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request, build_opener
 
 from . import assessment, contracts, reconciliation, signing, store, underwriting
 from .checks import ChecksClient
-from .http import document, expand, validator
+from .http import NoRedirect, document, expand, validator
 from .store import one
 
 log = logging.getLogger("loanflow.worker")
@@ -23,6 +23,7 @@ def no_checkpoint(*_):
 class AbsClient:
     def __init__(self, url=None):
         self.url = url
+        self.opener = build_opener(NoRedirect())
         doc = document("abs")
         paths = doc["paths"]
         operations = {
@@ -46,7 +47,7 @@ class AbsClient:
                                    "Content-Type": "application/json"})
         try:
             try:
-                response = urlopen(request, timeout=timeout)
+                response = self.opener.open(request, timeout=timeout)
             except HTTPError as exc:
                 response = exc
             with response:

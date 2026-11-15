@@ -8,7 +8,7 @@ import pytest
 
 from services.loanflow import assessment, reconciliation
 from services.loanflow.abs import create_abs, post_pending
-from services.loanflow.store import connect, enqueue
+from services.loanflow.store import connect, enqueue, migrate
 from services.loanflow.worker import AbsClient
 from test_service import (SimulatedProcessStop, assert_reserve, crash_at, http_server, pause_at, process, setup_stand,
                           signed_contract, submit, update_scenario, worker)
@@ -279,17 +279,34 @@ def test_posted_wrong_correlation_does_not_change_reserve(setup_stand, monkeypat
         assert stand.request("GET", f"/contracts/{contract}", 200)["status"] == "DISBURSEMENT_PROCESSING"
         path = f"/reconciliation/instructions/{instruction}"
         card = stand.request("GET", path, 200, "reconciliation")
-        assert card["last_correlation_error"]["mismatch_kind"] == category
+        diagnostic = card["last_correlation_error"]
+        assert set(diagnostic) == {"operation", "mismatch_kind", "observed_at"}
+        assert diagnostic["mismatch_kind"] == category
+        assert stand.sql("SELECT instruction_id,operation,mismatch_kind FROM abs_correlation_error") == [{
+            "instruction_id": instruction, "operation": "SEND", "mismatch_kind": category,
+        }]
         assert_reserve(stand, "HELD")
         assert not stand.sql("SELECT * FROM abs_final_result")
         register(stand, path)
         process(stand, "ABS_READ", abs_client=client)
         assert read(stand, path, 1) == "CORRELATION_ERROR"
+        assert stand.sql("SELECT response_instruction_id FROM abs_read WHERE read_seq=1") == [
+            {"response_instruction_id": None},
+        ]
         monkeypatch.setattr(abs, "payload", original)
         register(stand, path)
         process(stand, "ABS_READ", abs_client=client)
         assert read(stand, path, 2) == "POSTED"
         assert_reserve(stand, "CONSUMED")
+        if field == "instruction_id":
+            # Состояние базы до миграции 009.
+            stand.sql("DELETE FROM service_migration WHERE name='009_abs_read_diagnostics.sql'")
+            stand.sql("UPDATE abs_read SET response_instruction_id=%s WHERE read_seq=1", (value,))
+            migrate(stand.dsn)
+            assert stand.sql("SELECT result,response_instruction_id FROM abs_read ORDER BY read_seq") == [
+                {"result": "CORRELATION_ERROR", "response_instruction_id": None},
+                {"result": "POSTED", "response_instruction_id": instruction},
+            ]
 
 
 def test_final_apply_rollback_recovers_by_read(setup_stand, monkeypatch):

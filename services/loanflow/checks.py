@@ -3,13 +3,13 @@ import os
 from functools import lru_cache
 from http.client import HTTPException
 from urllib.error import HTTPError
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import Request, build_opener
 from uuid import UUID
 
 from jsonschema import ValidationError
 from lxml import etree
 
-from .http import document, validator
+from .http import NoRedirect, document, validator
 from .store import ROOT
 
 REST_PATHS = {"CREDIT_REPORT": "/credit-reports", "FRAUD": "/fraud-checks"}
@@ -55,11 +55,6 @@ def parse_passport(raw, operation):
         raise ValueError("Unexpected SOAP operation")
     passport_schema().assertValid(element)
     return {etree.QName(field).localname: field.text for field in element}
-
-
-class NoRedirect(HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
 
 
 class ChecksClient:

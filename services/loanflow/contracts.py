@@ -105,10 +105,16 @@ def identify_contact_center_customer(ctx, contract_id):
     return 200, dict(identification_token=token, expires_at=expires)
 
 
+def require_contact_context(ctx, row):
+    if ctx.actor["identified_customer_id"] != row["customer_id"]:
+        raise ApiError(409, "IDENTIFICATION_REQUIRED")
+
+
 def withdraw_in_contact_center(ctx, contract_id):
     row = lock_contract(ctx.db, contract_id)
     if row["status"] != "COOLING_OFF":
         raise unavailable(row)
+    require_contact_context(ctx, row)
     actor = ctx.actor
     confirmation = one(ctx.db, """SELECT expires_at FROM contact_identification
                                    WHERE (token_digest,session_ref,principal,customer_id,contract_id)

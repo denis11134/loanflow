@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from services.loanflow import http, reconciliation, signing, worker as worker_module
+from services.loanflow import http, reconciliation, signing
 from services.loanflow.abs import post_pending
 from services.loanflow.checks import CHECK_STAGES, ChecksClient
 from services.loanflow.store import as_json, connect
@@ -149,7 +149,7 @@ def test_abs_truncated_read_finishes_as_timeout_without_retry(setup_stand, monke
             return TruncatedResponse()
 
         with monkeypatch.context() as patch:
-            patch.setattr(worker_module, "urlopen", truncated)
+            patch.setattr(client.opener, "open", truncated)
             process(stand, "ABS_READ", abs_client=client)
         assert timeouts == [2]
         assert read(stand, path, 1) == "TIMEOUT"
