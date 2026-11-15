@@ -78,6 +78,8 @@ nav:
           - Выдача через учебную АБС: 06-integrations/4.1-abs-disbursement.md
       - 4.2. Маппинги полей: 06-integrations/4.2-field-mappings.md
       - Контракт учебной АБС: 06-integrations/abs-contract.md
-  - Архитектура: 07-architecture/index.md
+  - Архитектура:
+      - 07-architecture/index.md
+      - 5.1. Декомпозиция LoanFlow: 07-architecture/5.1-service-decomposition.md
   - 1.7. Прототипы: 08-prototypes/index.md
   - Архитектурные решения: decisions/index.md
