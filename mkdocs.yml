@@ -81,5 +81,6 @@ nav:
   - Архитектура:
       - 07-architecture/index.md
       - 5.1. Декомпозиция LoanFlow: 07-architecture/5.1-service-decomposition.md
+      - 5.2. Событийная модель оценки: 07-architecture/5.2-assessment-events.md
   - 1.7. Прототипы: 08-prototypes/index.md
   - Архитектурные решения: decisions/index.md
