@@ -9,9 +9,11 @@ x-loanflow: &loanflow
     LOANFLOW_ABS_TOKEN: ${LOANFLOW_ABS_TOKEN:?generate a local ABS token}
     LOANFLOW_ABS_URL: http://abs:8001
     LOANFLOW_CHECKS_URL: http://checks:8002
+    LOANFLOW_KAFKA_BOOTSTRAP: kafka:9092
+    LOANFLOW_ASSESSMENT_TOKEN: ${LOANFLOW_ASSESSMENT_TOKEN:?generate an assessment service token}
 
 services:
-  postgres:
+  postgres: &postgres
     image: postgres:18.6
     command:
       - postgres
@@ -88,12 +90,93 @@ services:
 
   worker:
     <<: *loanflow
-    command: ["python", "-m", "services.loanflow.worker"]
+    command: ["python", "-m", "services.loanflow.events", "core"]
     depends_on:
       abs:
         condition: service_healthy
       checks:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+
+  assessment-postgres:
+    <<: *postgres
+    environment:
+      POSTGRES_USER: assessment
+      POSTGRES_PASSWORD: stand-assessment-postgres
+      POSTGRES_DB: assessment
+    volumes:
+      - assessment_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "assessment", "-d", "assessment"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  assessment-migrate:
+    <<: *loanflow
+    environment: &assessment_environment
+      LOANFLOW_DSN: postgresql://assessment:stand-assessment-postgres@assessment-postgres/assessment
+      LOANFLOW_SECRET: ${LOANFLOW_ASSESSMENT_SECRET:?generate an assessment secret}
+      LOANFLOW_ASSESSMENT_TOKEN: ${LOANFLOW_ASSESSMENT_TOKEN:?generate an assessment service token}
+      LOANFLOW_CORE_URL: http://api:8000
+      LOANFLOW_CHECKS_URL: http://checks:8002
+      LOANFLOW_KAFKA_BOOTSTRAP: kafka:9092
+    command: ["python", "-m", "services.loanflow.events", "migrate"]
+    depends_on:
+      assessment-postgres:
+        condition: service_healthy
+
+  assessment:
+    <<: *loanflow
+    environment: *assessment_environment
+    command: ["python", "-m", "services.loanflow.events", "assessment"]
+    depends_on:
+      assessment-migrate:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+      api:
+        condition: service_started
+      checks:
+        condition: service_healthy
+
+  kafka:
+    image: apache/kafka:4.1.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kafka_data:/tmp/kraft-combined-logs
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  kafka-init:
+    <<: *loanflow
+    command: ["python", "-m", "services.loanflow.events", "topics"]
+    depends_on:
+      kafka:
+        condition: service_healthy
 
 volumes:
   pgdata:
+  assessment_pgdata:
+  kafka_data:

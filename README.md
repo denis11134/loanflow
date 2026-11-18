@@ -50,16 +50,20 @@ import os
 from secrets import token_hex, token_urlsafe
 print("LOANFLOW_SECRET=" + token_hex(32))
 print("LOANFLOW_ABS_TOKEN=" + token_urlsafe(32))
+print("LOANFLOW_ASSESSMENT_SECRET=" + token_hex(32))
+print("LOANFLOW_ASSESSMENT_TOKEN=" + token_urlsafe(32))
 print("LOANFLOW_UID=" + str(os.getuid()))
 print("LOANFLOW_GID=" + str(os.getgid()))
 PYENV
   )
 fi
 docker compose build
-docker compose up -d --wait postgres
+docker compose up -d --wait postgres assessment-postgres kafka
 docker compose run --rm migrate
+docker compose run --rm assessment-migrate
 docker compose run --rm seed
-docker compose up -d api abs checks worker
+docker compose run --rm kafka-init
+docker compose up -d api abs checks worker assessment
 ```
 
 Сервис принимает запросы на `127.0.0.1:8000`. Seed создаёт учебные токены всех шести ролей
@@ -74,25 +78,76 @@ python3.12 scripts/demo_service.py .cache/loanflow/tokens.json
 SHA-256 ИУ с PDF, полученным через HTTP. Для повторной демонстрации сначала отмените
 заявку из `APPROVED` с помощью её идентификатора, выведенного скриптом.
 
-Для запуска без Compose установите пакет `fonts-dejavu-core` и задайте `LOANFLOW_DSN` для чистого PostgreSQL 18,
-`LOANFLOW_SECRET`, `LOANFLOW_ABS_TOKEN`, `LOANFLOW_ABS_URL=http://127.0.0.1:8001` и
-`LOANFLOW_CHECKS_URL=http://127.0.0.1:8002`.
-На выделенном PostgreSQL стенда установите `log_min_messages=fatal`,
+Для запуска без Compose нужны PostgreSQL 18, Kafka 4.1.1, Java 21 и
+`fonts-dejavu-core`. Создайте две отдельные базы с разными учётными данными — ядро и оценку.
+Каждому процессу передаётся `LOANFLOW_DSN` его базы. Сервис оценки получает собственный
+`LOANFLOW_SECRET`, служебный токен `LOANFLOW_ASSESSMENT_TOKEN`,
+`LOANFLOW_CORE_URL=http://127.0.0.1:8000`, `LOANFLOW_CHECKS_URL=http://127.0.0.1:8002`
+и `LOANFLOW_KAFKA_BOOTSTRAP=127.0.0.1:9092`.
+У ядра тот же служебный токен для проверки чтения статуса и адрес Kafka,
+а также прежние настройки АБС.
+На PostgreSQL стенда установите `log_min_messages=fatal`,
 `log_min_error_statement=panic`, `log_parameter_max_length=0` и
 `log_parameter_max_length_on_error=0`, как в `compose.yaml`.
-Из корня репозитория выполните миграции и загрузку данных. Запустите четыре процесса
-в отдельных терминалах с теми же переменными.
+
+После установки зависимостей выполните миграцию и загрузку ядра с его окружением.
+В отдельном окружении базы оценки выполните её миграцию.
 
 ```bash
 python3.12 -m venv .venv
 .venv/bin/python -m pip install -r services/requirements.txt
 .venv/bin/python -m services.loanflow.seed migrate
 .venv/bin/python -m services.loanflow.seed seed --tokens .cache/loanflow/tokens.json
+.venv/bin/python -m services.loanflow.events topics
+# С LOANFLOW_DSN базы оценки
+.venv/bin/python -m services.loanflow.events migrate
+```
+
+В отдельных терминалах запустите API, АБС, проверки и процесс ядра с окружением ядра,
+процесс оценки — с окружением базы оценки.
+
+```bash
 .venv/bin/uvicorn services.loanflow.api:app --port 8000 --no-access-log
 .venv/bin/uvicorn services.loanflow.abs:app --port 8001 --no-access-log
 .venv/bin/uvicorn services.loanflow.check_stubs:app --port 8002 --no-access-log
-.venv/bin/python -m services.loanflow.worker
+.venv/bin/python -m services.loanflow.events core
+.venv/bin/python -m services.loanflow.events assessment
 ```
+
+### Обновление до 5.3
+
+На прежней версии остановите приём новых подач и дождитесь завершения всех заявок
+в `SCORING`. Старая очередь оценки должна опустеть перед переключением транспорта.
+Заявки в `UNDERWRITING` сохраняют рассчитанные условия в ядре и завершаются прежней
+ручной командой. Предложения, резервы, доказательства подписи, договоры, outbox АБС
+и записи сверки продолжают использовать данные ядра. Сделайте резервную копию учебной БД,
+остановите прежние API и воркер, затем примените миграции и запустите новый Compose.
+Для существующего `.env` добавьте независимо сгенерированные
+`LOANFLOW_ASSESSMENT_SECRET` и `LOANFLOW_ASSESSMENT_TOKEN` командой Python из примера выше.
+Загрузчик seed повторно не требуется.
+
+Миграция 010 добавляет учёт распределённых оценок и сохранённый признак предупреждения ПДН.
+Для прежних записей признак вычисляется по прежним полям оценки.
+Процесс ядра проверяет отсутствие старых заданий оценки в `SCORING` перед запуском.
+Два топика создаются идемпотентной командой `events topics`.
+
+### Проверка реального Kafka без Docker
+
+Установите `requirements-checks.txt`, распакуйте официальный Kafka 4.1.1 и задайте
+`JAVA_HOME` для Java 21. Команда запускает временный брокер, две отдельные базы,
+HTTP-сервисы и приёмочные процессы, затем останавливает их.
+
+```bash
+KAFKA_HOME=/absolute/path/kafka_2.13-4.1.1 \
+PG_BINDIR=/usr/lib/postgresql/18/bin \
+.venv/bin/python -m pytest -q tests/test_kafka.py --require-kafka
+```
+
+В CI реальный обмен проходит отдельным обязательным заданием на Python 3.12.
+Прежние локальные сервисные регрессии и Postman используют встроенный обработчик оценки
+при отсутствии `LOANFLOW_KAFKA_BOOTSTRAP`. Для распределённого запуска эта переменная обязательна.
+Параметры учебных сбоев оценки доступны в `training_assessment_fault` базы оценки
+по заявке, этапу и номеру попытки. Они используются приёмочными сценариями с синтетическими данными.
 
 Набор [services/scenarios.json](services/scenarios.json) задаёт доход, текущие платежи,
 результаты внешних проверок, квоты и доверенные контексты. График, ПДН, рекомендация DE и учебная
