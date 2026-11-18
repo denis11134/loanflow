@@ -22,6 +22,7 @@ def migrate(dsn=None):
     with connect(dsn) as db:
         db.execute("SELECT pg_advisory_xact_lock(301, 1)")
         db.execute("CREATE TABLE IF NOT EXISTS service_migration (name text PRIMARY KEY)")
+        db.execute((ROOT / "services/loanflow/event_store.sql").read_text())
         applied = {r["name"] for r in db.execute("SELECT name FROM service_migration")}
         for path in files:
             if path.name not in applied:

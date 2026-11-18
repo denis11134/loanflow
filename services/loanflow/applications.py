@@ -44,7 +44,8 @@ def offer_row(db, application_id):
     return one(db, """
         SELECT o.*, t.terms_id, t.document_sha256, t.first_provided_at, t.offer_expires_at,
                t.warning_first_shown_at, t.warning_text_version, r.state AS reserve_state,
-               CASE WHEN s.rules_version IS NULL THEN e.pdn_percent > 50
+               CASE WHEN e.pdn_notice_required IS NOT NULL THEN e.pdn_notice_required
+                    WHEN s.rules_version IS NULL THEN e.pdn_percent > 50
                     ELSE (e.monthly_existing_payments_rub + e.requested_monthly_payment_rub) * 100
                          > e.monthly_payroll_income_rub * 50
                END AS pdn_notice_required
@@ -166,7 +167,11 @@ def submit_application(ctx, application_id):
                       requested_term_months,is_payroll,profile_version_ref,rules_version)
                       VALUES (%s,%s,%s,%s,%s,%s)""",
                    (application_id, amount, term, True, profile["version_ref"], RULES_VERSION))
-        enqueue(db, "AML", application_id, submitted_at)
+        from . import core_events, event_bus
+        if event_bus.enabled():
+            core_events.request_assessment(db, application_id, submitted_at)
+        else:
+            enqueue(db, "AML", application_id, submitted_at)
     return 202, {"application_id": application_id, "submitted_at": submitted_at, "accepted_status": "SCORING"}
 
 

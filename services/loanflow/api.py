@@ -79,7 +79,10 @@ def create_app(dsn=None, clock=store.now):
     def invalid(_operation, _args):
         return JSONResponse({"code": "INVALID_REQUEST", "message": "INVALID_REQUEST"}, status_code=400)
 
-    return routes("loanflow", invoke, invalid, clock)
+    from .internal_api import attach
+    app = routes("loanflow", invoke, invalid, clock)
+    attach(app, dsn)
+    return app
 
 
 app = create_app()

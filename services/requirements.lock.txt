@@ -20,3 +20,4 @@ six==1.17.0
 starlette==1.10.0
 typing-extensions==4.16.0
 typing-inspection==0.4.5
+confluent-kafka==2.16.1
