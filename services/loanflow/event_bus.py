@@ -42,6 +42,8 @@ def queue(db, topic, payload, at):
 
 
 def timestamp(value):
+    if not Draft7Validator.FORMAT_CHECKER.conforms(value, "date-time"):
+        raise ValueError("Invalid event timestamp")
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
