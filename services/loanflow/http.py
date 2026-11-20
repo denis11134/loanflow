@@ -146,7 +146,7 @@ def routes(name, invoke, invalid, clock=store.now):
             if method in {"get", "post", "patch", "put"}:
                 app.add_api_route(path, endpoint(path, method, operation), methods=[method.upper()],
                                   name=operation["operationId"])
-    from .observability import HttpMetrics, Registry
+    from .diagnostics import HttpMetrics, Registry
     registry = Registry(route.name for route in app.routes if route.name != "openapi")
     app.state.http_metrics = registry
     app.add_middleware(HttpMetrics, registry=registry)

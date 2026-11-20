@@ -181,7 +181,7 @@ class Worker:
 def main():
     logging.basicConfig(level=logging.INFO)
     worker = Worker()
-    from .observability import worker_monitor
+    from .diagnostics import worker_monitor
     with worker_monitor("core", worker.dsn) as monitor:
         while True:
             try:

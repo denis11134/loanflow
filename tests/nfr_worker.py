@@ -9,7 +9,7 @@ from threading import Event
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from services.loanflow.events import EventProcess, run_loop
-from services.loanflow.observability import worker_monitor
+from services.loanflow.diagnostics import worker_monitor
 
 
 def main():

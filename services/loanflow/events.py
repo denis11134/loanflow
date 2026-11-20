@@ -8,7 +8,7 @@ from time import sleep
 
 from . import assessment_service, core_events, event_bus, store
 from .worker import Worker, no_checkpoint
-from .observability import worker_monitor
+from .diagnostics import worker_monitor
 
 log = logging.getLogger("loanflow.events")
 

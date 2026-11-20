@@ -4,11 +4,19 @@ from concurrent.futures import ThreadPoolExecutor
 from http.client import HTTPConnection
 import logging
 import time
+import os
+import subprocess
+import sys
+import socket
+from threading import Thread
+import pytest
 from uuid import uuid4
 
-from services.loanflow import assessment_service, observability as obs
+from services.loanflow import assessment_service, diagnostics as obs
 from services.loanflow.api import create_app
 from test_service import setup_stand, http_server
+from services.loanflow import store
+from services.loanflow.probes import run_probe, ProbeUnavailable
 
 
 def get(port, path, token=None):
@@ -144,3 +152,83 @@ def test_started_instruction_is_visible_without_resending(setup_stand, monkeypat
         assert data["uncertain_instructions"]["count"] == 1
         assert not worker(stand, abs_client=client).run_once("SEND")
         assert calls(stand, instruction, "SEND") == 0
+
+
+@pytest.mark.parametrize("mode", ["headers", "body"])
+def test_cli_total_deadline_includes_slow_body_and_process_exit(mode):
+    """Порции приходят чаще socket timeout; общий бюджет всё равно ограничен."""
+    with socket.socket() as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen()
+        server.settimeout(5)
+        def slow_body():
+            connection, _ = server.accept()
+            with connection:
+                connection.recv(4096)
+                connection.sendall(b"HTTP/1.1 200 OK\r\n" + (
+                    b"Content-Length: 200\r\nConnection: close\r\n\r\n" if mode == "body" else b"X-Stand: "))
+                try:
+                    for _ in range(32):
+                        connection.sendall(b" ")
+                        time.sleep(.1)
+                except OSError:
+                    pass
+        thread = Thread(target=slow_body, daemon=True)
+        thread.start()
+        began = time.monotonic()
+        command = [sys.executable, "-m", "services.loanflow.observability", "--url",
+                   f"http://127.0.0.1:{server.getsockname()[1]}"]
+        result = subprocess.run(command, cwd=store.ROOT, capture_output=True, text=True, timeout=5,
+                                env=dict(os.environ, LOANFLOW_MONITOR_TOKEN="synthetic-monitor"))
+        elapsed = time.monotonic()-began
+        thread.join(4)
+        assert result.returncode == 0
+        assert elapsed < 2, f"Общий бюджет CLI превышен: {elapsed:.3f} с"
+        print(f"cli_total_seconds[{mode}]={elapsed:.3f}")
+        assert "unavailable" in result.stdout and "synthetic-monitor" not in result.stdout+result.stderr
+
+
+def test_repeated_timeouts_leave_no_children_or_background_threads():
+    from pathlib import Path
+    import threading
+    import pytest
+
+    def children():
+        return {pid for task in Path("/proc/self/task").iterdir()
+                for pid in (task/"children").read_text().split()}
+
+    async def run():
+        active = set()
+        async def unfinished(reader, writer):
+            task = asyncio.current_task()
+            active.add(task)
+            try:
+                await reader.readuntil(b"\r\n\r\n")
+                writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 1000\r\n\r\n")
+                while True:
+                    writer.write(b" ")
+                    await writer.drain()
+                    await asyncio.sleep(.03)
+            except (OSError, asyncio.IncompleteReadError):
+                pass
+            finally:
+                writer.close()
+                try:
+                    await writer.wait_closed()
+                except OSError:
+                    pass
+                active.discard(task)
+        before, threads = children(), {thread.ident for thread in threading.enumerate()}
+        server = await asyncio.start_server(unfinished, "127.0.0.1", 0)
+        async with server:
+            url = f"http://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+            began = time.monotonic()
+            for budget in (.25, .25, .25, .001):
+                with pytest.raises(ProbeUnavailable):
+                    await run_probe("http", {"url": url}, timeout=budget)
+                assert children() == before
+            await asyncio.sleep(.15)
+            assert not active
+            assert {thread.ident for thread in threading.enumerate()} == threads
+            assert time.monotonic()-began < 1.5
+    asyncio.run(run())
