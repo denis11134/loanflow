@@ -1,0 +1,27 @@
+# Запуск: docker compose -f compose.yaml -f compose.camunda.yaml up --build
+services:
+  camunda:
+    image: camunda/camunda:8.10.9
+    command: ["--spring.config.additional-location=file:/usr/local/camunda/config/loanflow.yaml"]
+    environment:
+      CAMUNDA_MODE: all-in-one
+      CAMUNDA_CLUSTER_SIZE: "1"
+      CAMUNDA_CLUSTER_PARTITIONCOUNT: "1"
+      CAMUNDA_CLUSTER_REPLICATIONFACTOR: "1"
+      SERVER_ADDRESS: 0.0.0.0
+      LOANFLOW_CAMUNDA_DATA: /usr/local/camunda/data
+      JAVA_OPTS: -Xms256m -Xmx1024m -XX:MaxDirectMemorySize=256m -XX:ActiveProcessorCount=2
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./services/camunda/application.yaml:/usr/local/camunda/config/loanflow.yaml:ro
+      - camunda_data:/usr/local/camunda/data
+  assessment:
+    environment:
+      LOANFLOW_ASSESSMENT_ENGINE: camunda
+      LOANFLOW_CAMUNDA_URL: http://camunda:8080
+    depends_on:
+      camunda:
+        condition: service_started
+volumes:
+  camunda_data:

@@ -3,7 +3,10 @@
 !services/**
 !api/
 !api/*.openapi.yaml
+!api/assessment.asyncapi.yaml
 !api/passport.xsd
+!diagrams/
+!diagrams/loanflow-assessment.bpmn
 !sql/
 !sql/001_initial_schema.sql
 **/__pycache__/

@@ -8,4 +8,5 @@ COPY services/requirements*.txt services/
 RUN python -m pip install --no-cache-dir -r services/requirements.txt
 COPY services/ services/
 COPY api/ api/
+COPY diagrams/loanflow-assessment.bpmn diagrams/
 COPY sql/001_initial_schema.sql sql/
