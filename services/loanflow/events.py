@@ -8,6 +8,7 @@ from time import sleep
 
 from . import assessment_service, core_events, event_bus, store
 from .worker import Worker, no_checkpoint
+from .observability import worker_monitor
 
 log = logging.getLogger("loanflow.events")
 
@@ -20,7 +21,7 @@ class EventProcess:
         self.clock = clock
         self.checkpoint = checkpoint
         self.topic = event_bus.RESULT_TOPIC if role == "core" else event_bus.REQUEST_TOPIC
-        self.bus = event_bus.KafkaBus(self.topic, group or f"loanflow-{role}-v1", bootstrap)
+        self.bus = event_bus.KafkaBus(self.topic, group or os.environ.get("LOANFLOW_KAFKA_GROUP", f"loanflow-{role}-v1"), bootstrap)
         if role == "core":
             self.service = Worker(self.dsn, clock)
         else:
@@ -84,15 +85,22 @@ def main():
     signal.signal(signal.SIGTERM, lambda *_: stopping.set())
     signal.signal(signal.SIGINT, lambda *_: stopping.set())
     try:
-        while not stopping.is_set():
-            try:
-                if process.run_once():
-                    continue
-            except Exception as exc:
-                log.error("event_process_failed role=%s category=%s", args.action, type(exc).__name__)
-            sleep(0.1)
+        with worker_monitor(args.action, process.dsn) as monitor:
+            run_loop(process, stopping, monitor)
     finally:
         process.close()
+
+
+def run_loop(process, stopping, monitor):
+    while not stopping.is_set():
+        try:
+            worked = process.run_once()
+            monitor.cycle()
+            if worked:
+                continue
+        except Exception:
+            log.error("event_process_failed")
+        sleep(0.1)
 
 
 if __name__ == "__main__":

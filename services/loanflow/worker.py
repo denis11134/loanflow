@@ -181,13 +181,17 @@ class Worker:
 def main():
     logging.basicConfig(level=logging.INFO)
     worker = Worker()
-    while True:
-        try:
-            if worker.run_once():
-                continue
-        except Exception:
-            log.error("job_processing_failed")
-        sleep(0.25)
+    from .observability import worker_monitor
+    with worker_monitor("core", worker.dsn) as monitor:
+        while True:
+            try:
+                worked = worker.run_once()
+                monitor.cycle()
+                if worked:
+                    continue
+            except Exception:
+                log.error("job_processing_failed")
+            sleep(0.25)
 
 
 if __name__ == "__main__":

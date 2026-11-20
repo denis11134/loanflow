@@ -3,13 +3,14 @@ x-loanflow: &loanflow
   build:
     context: .
     dockerfile: services/Dockerfile
-  environment:
+  environment: &core_environment
     LOANFLOW_DSN: postgresql://loanflow:stand-postgres@postgres/loanflow
     LOANFLOW_SECRET: ${LOANFLOW_SECRET:?generate a local stand secret}
     LOANFLOW_ABS_TOKEN: ${LOANFLOW_ABS_TOKEN:?generate a local ABS token}
     LOANFLOW_ABS_URL: http://abs:8001
     LOANFLOW_CHECKS_URL: http://checks:8002
     LOANFLOW_KAFKA_BOOTSTRAP: kafka:9092
+    LOANFLOW_MONITOR_TOKEN: ${LOANFLOW_MONITOR_TOKEN:?generate a separate monitoring token}
     LOANFLOW_ASSESSMENT_TOKEN: ${LOANFLOW_ASSESSMENT_TOKEN:?generate an assessment service token}
 
 services:
@@ -90,6 +91,12 @@ services:
 
   worker:
     <<: *loanflow
+    environment:
+      <<: *core_environment
+      LOANFLOW_MONITOR_PORT: "8010"
+      LOANFLOW_MONITOR_HOST: 0.0.0.0
+    ports:
+      - "127.0.0.1:8010:8010"
     command: ["python", "-m", "services.loanflow.events", "core"]
     depends_on:
       abs:
@@ -119,6 +126,7 @@ services:
     <<: *loanflow
     environment: &assessment_environment
       LOANFLOW_DSN: postgresql://assessment:stand-assessment-postgres@assessment-postgres/assessment
+      LOANFLOW_MONITOR_TOKEN: ${LOANFLOW_MONITOR_TOKEN:?generate a separate monitoring token}
       LOANFLOW_SECRET: ${LOANFLOW_ASSESSMENT_SECRET:?generate an assessment secret}
       LOANFLOW_ASSESSMENT_TOKEN: ${LOANFLOW_ASSESSMENT_TOKEN:?generate an assessment service token}
       LOANFLOW_CORE_URL: http://api:8000
@@ -131,7 +139,12 @@ services:
 
   assessment:
     <<: *loanflow
-    environment: *assessment_environment
+    environment:
+      <<: *assessment_environment
+      LOANFLOW_MONITOR_PORT: "8011"
+      LOANFLOW_MONITOR_HOST: 0.0.0.0
+    ports:
+      - "127.0.0.1:8011:8011"
     command: ["python", "-m", "services.loanflow.events", "assessment"]
     depends_on:
       assessment-migrate:

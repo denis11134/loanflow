@@ -82,6 +82,8 @@ def create_app(dsn=None, clock=store.now):
     from .internal_api import attach
     app = routes("loanflow", invoke, invalid, clock)
     attach(app, dsn)
+    from .observability import attach as attach_diagnostics
+    attach_diagnostics(app, dsn, registry=app.state.http_metrics)
     return app
 
 
