@@ -25,6 +25,10 @@ ALTER TABLE assessment_task ADD COLUMN IF NOT EXISTS process_instance_key text;
 ALTER TABLE assessment_task ADD COLUMN IF NOT EXISTS launch_ack boolean NOT NULL DEFAULT false;
 ALTER TABLE assessment_task ADD COLUMN IF NOT EXISTS launch_after timestamptz NOT NULL DEFAULT now();
 ALTER TABLE assessment_task ADD COLUMN IF NOT EXISTS prepared_result jsonb;
+ALTER TABLE assessment_task ADD COLUMN IF NOT EXISTS progress_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE assessment_task ADD COLUMN IF NOT EXISTS wait_reason text
+    CHECK (wait_reason IN ('CORE','RETRY','ENGINE'));
+ALTER TABLE assessment_task ADD COLUMN IF NOT EXISTS wait_until timestamptz;
 CREATE UNIQUE INDEX IF NOT EXISTS assessment_instance_unique
     ON assessment_task(process_instance_key) WHERE process_instance_key IS NOT NULL;
 

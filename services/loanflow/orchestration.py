@@ -3,6 +3,7 @@ import base64
 import json
 import logging
 import os
+from datetime import timedelta
 from urllib.error import HTTPError
 from urllib.request import Request, build_opener
 from uuid import UUID
@@ -138,9 +139,11 @@ class CamundaAssessmentService(assessment_service.AssessmentService):
                               WHERE application_id=%s AND process_instance_key IS NULL""",
                            (key, task["application_id"]))
             except CamundaError as exc:
+                assessment_service.progress(db, task, self.clock(), "ENGINE", advanced=False)
                 if exc.status != 409:
                     log.error("camunda_start_failed category=HTTP_%s", exc.status)
             except Exception as exc:
+                assessment_service.progress(db, task, self.clock(), "ENGINE", advanced=False)
                 log.error("camunda_start_failed category=%s", type(exc).__name__)
         return True
 
@@ -196,6 +199,8 @@ class CamundaAssessmentService(assessment_service.AssessmentService):
                     db.execute("""UPDATE assessment_task SET process_instance_key=%s,launch_ack=true
                                   WHERE application_id=%s""", (instance, app_id))
                     response = {"route": "NEXT"}
+                    if task["process_instance_key"] is None:
+                        assessment_service.progress(db, task, self.clock())
             elif task["process_instance_key"] != instance or task["stage"] in ("COMPLETED", "CANCELED"):
                 response = STOP
             elif kind == "finalize" and task["stage"] != "RESULT_READY":
@@ -211,8 +216,10 @@ class CamundaAssessmentService(assessment_service.AssessmentService):
     def perform(self, db, task, kind):
         active = self.state.active(task)
         if active is None:
+            assessment_service.progress(db, task, self.clock(), "CORE", advanced=False)
             return {"route": "WAIT", "waitDuration": "PT1S"}
         if not active:
+            assessment_service.progress(db, task, self.clock())
             db.execute("UPDATE assessment_task SET stage='CANCELED' WHERE application_id=%s", (task["application_id"],))
             return STOP
         if kind == "finalize":
@@ -223,9 +230,12 @@ class CamundaAssessmentService(assessment_service.AssessmentService):
         self.checkpoint("after_assessment_step", task)
         attempt = task["failures"] + 1
         if transport == "TEMPORARY" and task["failures"] < 2:
+            assessment_service.progress(db, task, self.clock(), "RETRY",
+                self.clock()+timedelta(seconds=assessment_service.RETRY_DELAYS[task['failures']]))
             db.execute("UPDATE assessment_task SET failures=failures+1 WHERE application_id=%s", (task["application_id"],))
             response = {"route": "WAIT", "waitDuration": f"PT{assessment_service.RETRY_DELAYS[task['failures']]}S"}
         else:
+            assessment_service.progress(db, task, self.clock())
             if transport != "OK":
                 result = assessment_service.failed("RETRIES_EXHAUSTED" if transport == "TEMPORARY" else "PERMANENT")
             if result is not None:

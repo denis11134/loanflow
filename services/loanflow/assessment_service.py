@@ -69,10 +69,10 @@ def accept_request(db, payload, clock):
         return None if bytes(existing["request_fingerprint"]) == fingerprint else "REQUEST_CONFLICT"
     engine = assessment_engine()
     db.execute("""INSERT INTO assessment_task
-                  (application_id,submitted_at,request_fingerprint,inputs,stage,run_at,engine)
-                  VALUES (%s,%s,%s,%s,'AML',%s,%s)""",
+                  (application_id,submitted_at,request_fingerprint,inputs,stage,run_at,engine,progress_at)
+                  VALUES (%s,%s,%s,%s,'AML',%s,%s,%s)""",
                (application_id, event_bus.timestamp(payload["submitted_at"]), fingerprint,
-                Jsonb(payload["inputs"]), clock(), engine))
+                Jsonb(payload["inputs"]), clock(), engine, clock()))
     return None
 
 
@@ -81,6 +81,13 @@ def assessment_engine():
     if engine not in ("local", "camunda"):
         raise ValueError("Unknown assessment engine")
     return engine
+
+
+def progress(db, task, at, reason=None, until=None, advanced=True):
+    # Повторное чтение состояния, доставка или инфраструктурный повтор не являются продвижением.
+    db.execute("""UPDATE assessment_task SET progress_at=CASE WHEN %s THEN %s ELSE progress_at END,
+                  wait_reason=%s,wait_until=%s WHERE application_id=%s""",
+               (advanced, at, reason, until, task["application_id"]))
 
 
 def reject(reason):
@@ -145,17 +152,20 @@ class AssessmentService:
     def process_task(self, db, task):
         active = self.state.active(task)
         if active is None:
+            progress(db, task, self.clock(), "CORE", advanced=False)
             db.execute("UPDATE assessment_task SET run_at=%s WHERE application_id=%s",
                        (self.clock() + timedelta(seconds=1), task["application_id"]))
             return
         if not active:
             db.execute("UPDATE assessment_task SET stage='CANCELED' WHERE application_id=%s",
                        (task["application_id"],))
+            progress(db, task, self.clock())
             return
         self.checkpoint("before_assessment_step", task)
         result, next_stage, data, transport = self.step(db, task)
         self.checkpoint("after_assessment_step", task)
         if transport == "TEMPORARY" and task["failures"] < 2:
+            progress(db, task, self.clock(), "RETRY", self.clock() + timedelta(seconds=RETRY_DELAYS[task["failures"]]))
             db.execute("""UPDATE assessment_task SET failures=failures+1,run_at=%s
                           WHERE application_id=%s""",
                        (self.clock() + timedelta(seconds=RETRY_DELAYS[task["failures"]]), task["application_id"]))
@@ -164,6 +174,7 @@ class AssessmentService:
         elif result is not None:
             self.complete(db, task, result)
         else:
+            progress(db, task, self.clock())
             db.execute("""UPDATE assessment_task SET stage=%s,data=%s,failures=0,run_at=%s
                           WHERE application_id=%s""", (next_stage, Jsonb(data), self.clock(), task["application_id"]))
         self.checkpoint("before_assessment_commit", task)
@@ -225,6 +236,7 @@ class AssessmentService:
         return None, "DE", data, "OK"
 
     def complete(self, db, task, result):
+        progress(db, task, self.clock())
         payload = {"message_id": str(uuid4()), "application_id": str(task["application_id"]),
                    "submitted_at": task["submitted_at"].isoformat(), "result": result}
         event_bus.queue(db, event_bus.RESULT_TOPIC, payload, self.clock())
