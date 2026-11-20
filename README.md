@@ -31,6 +31,7 @@ HTML-прототип, OpenAPI в главе 2.3 и пять проверенн�
 | [sql/practicum/](sql/practicum/README.md) | Синтетические фикстуры, пять существующих решений и описание проверки |
 | [docs/08-prototypes/](docs/08-prototypes/index.md) | HTML-демо, его границы и инструкция |
 | [services/](services/) | FastAPI, воркер, учебная АБС, сервисные миграции и синтетический набор |
+| [diagrams/loanflow-assessment.bpmn](diagrams/loanflow-assessment.bpmn) | Исполняемый каскад оценки Camunda и схема BPMN DI |
 | [tests/](tests/) | OpenAPI, MkDocs, PostgreSQL, браузер и интеграционные HTTP-тесты |
 | [.github/workflows/checks.yml](.github/workflows/checks.yml) | CI технической части и отдельная блокирующая проверка контрактов |
 
@@ -130,6 +131,62 @@ python3.12 -m venv .venv
 Для прежних записей признак вычисляется по прежним полям оценки.
 Процесс ядра проверяет отсутствие старых заданий оценки в `SCORING` перед запуском.
 Два топика создаются идемпотентной командой `events topics`.
+
+### Оркестрация оценки 5.4
+
+Camunda Run 8.10.9 для Linux управляет последовательностью и ожиданиями оценки.
+PostgreSQL сервиса оценки хранит входы, расчёты, журнал шагов и результат; ядро
+продолжает применять решение и выполнять таймеры подписания и выдачу через АБС.
+Исходник процесса, интерфейс воркера и порядок обновления описаны в
+[главе 5.4](docs/07-architecture/5.4-assessment-orchestration.md). Перед обновлением
+завершите все заявки в `SCORING`; повторный seed и сброс Kafka offsets не требуются.
+
+По умолчанию `LOANFLOW_ASSESSMENT_ENGINE=local`. Для режима `camunda` после подготовки
+PostgreSQL, Kafka, миграций и seed замените команду запуска прикладных сервисов:
+
+```bash
+docker compose -f compose.yaml -f compose.camunda.yaml up -d --build api abs checks worker assessment camunda
+```
+
+Overlay сохраняет данные движка в `camunda_data` и включает режим Camunda только
+для `assessment`. Для следующих команд Compose указывайте оба файла.
+
+Для запуска без Docker подготовьте Camunda Run и скопируйте локальную конфигурацию:
+
+```bash
+.venv/bin/python scripts/prepare_camunda.py --cache-dir .cache/camunda-8.10.9
+export CAMUNDA_HOME="$PWD/.cache/camunda-8.10.9/c8run-8.10.9"
+cp services/camunda/application.yaml "$CAMUNDA_HOME/loanflow.yaml"
+(cd "$CAMUNDA_HOME" && ./c8run start --no-browser --disable-connectors --config loanflow.yaml)
+```
+
+Загрузчик проверяет закреплённые размер и SHA-256 архива и печатает абсолютный путь
+`CAMUNDA_HOME`. Дистрибутив включает Java. После готовности
+`http://127.0.0.1:8080/v2/topology` в отдельном терминале с окружением **базы оценки**:
+
+```bash
+LOANFLOW_ASSESSMENT_ENGINE=camunda \
+LOANFLOW_CAMUNDA_URL=http://127.0.0.1:8080 \
+.venv/bin/python -m services.loanflow.events assessment
+```
+
+Воркер автоматически разворачивает BPMN при создании новой оценки. Остальные
+процессы используют прежние команды 5.3, свои базы и существующие секреты.
+Движок останавливается командой `(cd "$CAMUNDA_HOME" && ./c8run stop)`.
+
+Приёмочный прогон использует настоящий движок и Kafka:
+
+```bash
+CAMUNDA_HOME="$PWD/.cache/camunda-8.10.9/c8run-8.10.9" \
+KAFKA_HOME=/absolute/path/kafka_2.13-4.1.1 \
+JAVA_HOME=/absolute/path/jdk-21 \
+PG_BINDIR=/usr/lib/postgresql/18/bin \
+.venv/bin/python -m pytest -q tests/test_camunda.py --require-camunda --require-kafka
+```
+
+Нативный запуск проверяется на настоящих Camunda, Kafka и PostgreSQL отдельным
+обязательным заданием CI. Оно также проверяет конфигурацию Compose, сборку образа
+LoanFlow и наличие в нём AsyncAPI и BPMN.
 
 ### Проверка реального Kafka без Docker
 
