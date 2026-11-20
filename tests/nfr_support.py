@@ -13,6 +13,7 @@ from uuid import uuid4
 
 import psycopg
 from confluent_kafka.admin import AdminClient
+from confluent_kafka import KafkaException
 
 from services.loanflow import assessment_service, event_bus, store
 from services.loanflow.seed import DEMO, seed
@@ -28,7 +29,7 @@ def until(check, timeout, message):
             result = check()
             if result:
                 return result
-        except (OSError, ValueError, psycopg.Error):
+        except (OSError, ValueError, psycopg.Error, KafkaException):
             pass
         if time.monotonic() >= deadline:
             raise AssertionError(message)
