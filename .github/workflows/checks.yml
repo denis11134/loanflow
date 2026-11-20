@@ -138,7 +138,9 @@ jobs:
           LOANFLOW_ASSESSMENT_SECRET: ci-config-validation
         run: docker compose -f compose.yaml -f compose.camunda.yaml config --quiet
       - name: Приёмка 5.4 с обязательными настоящими движком и брокером
-        run: python -m pytest -q --tb=short tests/test_camunda.py --require-camunda --require-kafka --basetemp=test-results/camunda-runtime --junitxml=test-results/camunda.xml
+        run: |
+          mkdir -p test-results
+          python -m pytest -q --tb=short tests/test_camunda.py --require-camunda --require-kafka --basetemp=test-results/camunda-runtime --junitxml=test-results/camunda.xml
       - name: Сборка образа и проверка ресурсов оценки
         run: |
           docker build -f services/Dockerfile -t loanflow-stand:ci .
