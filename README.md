@@ -51,6 +51,7 @@ import os
 from secrets import token_hex, token_urlsafe
 print("LOANFLOW_SECRET=" + token_hex(32))
 print("LOANFLOW_ABS_TOKEN=" + token_urlsafe(32))
+print("LOANFLOW_MONITOR_TOKEN=" + token_urlsafe(32))
 print("LOANFLOW_ASSESSMENT_SECRET=" + token_hex(32))
 print("LOANFLOW_ASSESSMENT_TOKEN=" + token_urlsafe(32))
 print("LOANFLOW_UID=" + str(os.getuid()))
@@ -283,3 +284,28 @@ CI использует Ubuntu 24.04 без переопределения. В �
 
 Документация: <http://127.0.0.1:8000>. Демо доступно через раздел «1.7. Прототипы» или
 при открытии [HTML-файла](docs/08-prototypes/loanflow-demo.html) в браузере.
+
+## Проверки производительности и диагностика
+
+Глава [5.5](docs/07-architecture/5.5-nonfunctional-requirements.md) фиксирует согласованные
+учебные цели, границы измерений и команды. На существующем стенде добавьте в защищённый
+`.env` отдельный `LOANFLOW_MONITOR_TOKEN`, созданный через `token_urlsafe(32)`;
+не используйте токены АБС, оценки или пользователей. Примените миграции обеих баз и
+пересоздайте процессы с обновлённым окружением. Для запуска без Compose задайте
+`LOANFLOW_MONITOR_PORT=8010` ядру и `8011` оценке; доступ по умолчанию только loopback.
+Команда просмотра использует `LOANFLOW_MONITOR_TOKEN` из окружения:
+
+```bash
+.venv/bin/python -m services.loanflow.observability --url http://127.0.0.1:8000 --url http://127.0.0.1:8010 --url http://127.0.0.1:8011 --watch
+```
+
+Тяжёлая приёмка запускается в отдельном последовательном задании CI `nfr` после Camunda.
+На свободной машине с Python 3.12, PostgreSQL 18, Java 21, Kafka 4.1.1 и Camunda 8 Run 8.10.9:
+
+```bash
+PG_BINDIR=/usr/lib/postgresql/18/bin KAFKA_HOME="$PWD/.cache/kafka_2.13-4.1.1" CAMUNDA_HOME="$PWD/.cache/camunda-8.10.9/c8run-8.10.9" .venv/bin/python scripts/measure_nfr.py
+```
+
+Нужны минимум 4 GiB доступной RAM, 4 GiB свободного диска проекта и 1 GiB в `/tmp`.
+Для каждого запуска нужен новый каталог `--runtime`; отчёт `test-results/nfr.json`
+содержит три последовательных измерения, а неполный запуск имеет `passed=false`.
