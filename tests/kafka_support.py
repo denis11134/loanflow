@@ -18,7 +18,7 @@ def free_port():
 
 
 @contextmanager
-def kafka_server(directory):
+def kafka_server(directory, control=None):
     home = Path(os.environ["KAFKA_HOME"])
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
@@ -44,8 +44,19 @@ auto.create.topics.enable=false
     subprocess.run([str(home / "bin/kafka-storage.sh"), "format", "-t", str(uuid4()).replace("-", "")[:22],
                     "-c", str(config)], env=env, check=True, capture_output=True, timeout=60)
     with (directory / "broker.log").open("w") as log:
-        proc = subprocess.Popen([str(home / "bin/kafka-server-start.sh"), str(config)],
-                                env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        proc = None
+        def start():
+            nonlocal proc
+            proc = subprocess.Popen([str(home / "bin/kafka-server-start.sh"), str(config)],
+                                    env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+            return proc
+        def crash():
+            if proc.poll() is None:
+                os.killpg(proc.pid, signal.SIGKILL)
+                proc.wait(5)
+        start()
+        if control is not None:
+            control.update(start=start, crash=crash)
         try:
             bootstrap = f"127.0.0.1:{port}"
             admin = AdminClient({"bootstrap.servers": bootstrap, "log_level": 0})
