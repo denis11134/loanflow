@@ -101,12 +101,12 @@ class Runtime:
                 command = ["-m", "uvicorn", f"services.loanflow.{module}:app", "--host", "127.0.0.1",
                            "--port", str(port), "--no-access-log", "--log-level", "critical"]
                 self.start(name, command, self.env)
-            self.start("core", ["-m", "services.loanflow.events", "core"],
+            self.start("core", ["tests/nfr_worker.py", "core", str(self.directory)],
                        dict(self.env, LOANFLOW_MONITOR_PORT=str(self.core_monitor_port)))
             assessment_env = dict(self.env, LOANFLOW_DSN=self.assessment_dsn, LOANFLOW_SECRET="43"*32,
                                   LOANFLOW_MONITOR_PORT=str(self.assessment_monitor_port))
             assessment_env.pop("LOANFLOW_ABS_TOKEN", None)
-            self.start("assessment", ["-m", "services.loanflow.events", "assessment"], assessment_env)
+            self.start("assessment", ["tests/nfr_worker.py", "assessment", str(self.directory)], assessment_env)
             until(self.ready, 30, "Не готов учебный конвейер")
             return self
         except BaseException:
@@ -209,6 +209,8 @@ class Runtime:
     def __exit__(self, *exc):
         for proc in self.processes.values():
             if proc.poll() is None:
+                # Барьер SIGSTOP при неуспешном тесте не должен мешать завершению.
+                proc.send_signal(signal.SIGCONT)
                 proc.terminate()
                 try:
                     proc.wait(10)

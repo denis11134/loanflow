@@ -180,6 +180,11 @@ def failure_measurement(runtime, component, offset):
     try:
         for actor, app in items:
             assert runtime.http("POST", f"/applications/{app}/submission", actor)[0] == 202
+        if component in ("core", "assessment"):
+            (runtime.directory/(component+".arm")).write_text("armed")
+            os.kill(evaluator.pid, signal_number("CONT"))
+            until(lambda: (runtime.directory/(component+".reached")).exists(), 30,
+                  "Не достигнута граница подтверждения задания")
         began = time.monotonic()
         runtime.crash(component)
     finally:
@@ -217,6 +222,7 @@ def failure_measurement(runtime, component, offset):
     redeliver(runtime, applications)
     assert_effects(runtime, applications, approvals)
     return {"component": component, "accepted": 10, "completed": 10, "outage_seconds": startup-began,
+            "boundary": "before_ack" if component in ("core", "assessment") else "queued",
             "detection_seconds": detected, "dependency_startup_seconds": ready_at-startup,
             "recovery_seconds": recovered, "lost": 0, "duplicate_business_effects": 0,
             "passed": detected is not None and detected <= 15 and recovered <= 60}
