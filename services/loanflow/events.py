@@ -21,8 +21,14 @@ class EventProcess:
         self.checkpoint = checkpoint
         self.topic = event_bus.RESULT_TOPIC if role == "core" else event_bus.REQUEST_TOPIC
         self.bus = event_bus.KafkaBus(self.topic, group or f"loanflow-{role}-v1", bootstrap)
-        self.service = (Worker(self.dsn, clock) if role == "core" else
-                        assessment_service.AssessmentService(self.dsn, clock, state_client, checks_client, checkpoint))
+        if role == "core":
+            self.service = Worker(self.dsn, clock)
+        else:
+            implementation = assessment_service.AssessmentService
+            if assessment_service.assessment_engine() == "camunda":
+                from .orchestration import CamundaAssessmentService
+                implementation = CamundaAssessmentService
+            self.service = implementation(self.dsn, clock, state_client, checks_client, checkpoint)
 
     def handler(self, db, payload):
         if self.role == "core":
@@ -65,6 +71,14 @@ def main():
                                          AND j.kind IN ('AML','PASSPORT','CREDIT_REPORT','FRAUD','DE') LIMIT 1""")
             if unfinished:
                 raise SystemExit("Завершите старую оценку перед включением Kafka")
+    if args.action == "assessment":
+        engine = assessment_service.assessment_engine()
+        with store.connect() as db:
+            unfinished = store.one(db, """SELECT 1 FROM assessment_task
+                                         WHERE engine<>%s AND stage NOT IN ('COMPLETED','CANCELED') LIMIT 1""",
+                                   (engine,))
+            if unfinished:
+                raise SystemExit("Завершите текущую оценку перед сменой исполнителя")
     process = EventProcess(args.action)
     stopping = Event()
     signal.signal(signal.SIGTERM, lambda *_: stopping.set())

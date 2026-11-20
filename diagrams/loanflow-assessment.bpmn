@@ -1,0 +1,702 @@
+<?xml version='1.0' encoding='utf-8'?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" id="Definitions_Assessment" targetNamespace="https://loanflow.example/assessment" exporter="LoanFlow" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.0">
+  <bpmn:process id="loanflow-assessment" name="Оценка кредитной заявки" isExecutable="true">
+    <bpmn:documentation>Camunda управляет этапами и ожиданиями оценки. Данные оценки и результаты находятся в PostgreSQL; переменные процесса: assessmentId, route, waitDuration.</bpmn:documentation>
+    <bpmn:startEvent id="Start" name="Начало оценки">
+      <bpmn:outgoing>Flow_Start_REGISTER</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Task_REGISTER" name="Зарегистрировать экземпляр">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="loanflow-assessment-register" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Start_REGISTER</bpmn:incoming>
+      <bpmn:outgoing>Flow_REGISTER_Route</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_REGISTER" name="Экземпляр принят?">
+      <bpmn:incoming>Flow_REGISTER_Route</bpmn:incoming>
+      <bpmn:outgoing>Flow_REGISTER_STOP</bpmn:outgoing>
+      <bpmn:outgoing>Flow_REGISTER_NEXT</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_REGISTER" name="Дубликат процесса">
+      <bpmn:incoming>Flow_REGISTER_STOP</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_Start_REGISTER" sourceRef="Start" targetRef="Task_REGISTER" />
+    <bpmn:sequenceFlow id="Flow_REGISTER_Route" sourceRef="Task_REGISTER" targetRef="Gateway_REGISTER" />
+    <bpmn:sequenceFlow id="Flow_REGISTER_STOP" sourceRef="Gateway_REGISTER" targetRef="End_REGISTER" name="Остановить">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "STOP"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:serviceTask id="Task_AML" name="Проверить AML">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="loanflow-assessment-AML" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_REGISTER_NEXT</bpmn:incoming>
+      <bpmn:incoming>Flow_AML_Resume</bpmn:incoming>
+      <bpmn:outgoing>Flow_AML_Route</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_AML" name="Исход этапа">
+      <bpmn:incoming>Flow_AML_Route</bpmn:incoming>
+      <bpmn:outgoing>Flow_AML_NEXT</bpmn:outgoing>
+      <bpmn:outgoing>Flow_AML_FINISH</bpmn:outgoing>
+      <bpmn:outgoing>Flow_AML_STOP</bpmn:outgoing>
+      <bpmn:outgoing>Flow_AML_WAIT</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_STOP_AML" name="Оценка остановлена">
+      <bpmn:incoming>Flow_AML_STOP</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:intermediateCatchEvent id="Timer_AML" name="Пауза / повтор">
+      <bpmn:incoming>Flow_AML_WAIT</bpmn:incoming>
+      <bpmn:outgoing>Flow_AML_Resume</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerDefinition_AML">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">= waitDuration</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="Task_PASSPORT" name="Проверить паспорт и согласие">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="loanflow-assessment-PASSPORT" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_AML_NEXT</bpmn:incoming>
+      <bpmn:incoming>Flow_PASSPORT_Resume</bpmn:incoming>
+      <bpmn:outgoing>Flow_PASSPORT_Route</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_PASSPORT" name="Исход этапа">
+      <bpmn:incoming>Flow_PASSPORT_Route</bpmn:incoming>
+      <bpmn:outgoing>Flow_PASSPORT_NEXT</bpmn:outgoing>
+      <bpmn:outgoing>Flow_PASSPORT_FINISH</bpmn:outgoing>
+      <bpmn:outgoing>Flow_PASSPORT_STOP</bpmn:outgoing>
+      <bpmn:outgoing>Flow_PASSPORT_WAIT</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_STOP_PASSPORT" name="Оценка остановлена">
+      <bpmn:incoming>Flow_PASSPORT_STOP</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:intermediateCatchEvent id="Timer_PASSPORT" name="Пауза / повтор">
+      <bpmn:incoming>Flow_PASSPORT_WAIT</bpmn:incoming>
+      <bpmn:outgoing>Flow_PASSPORT_Resume</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerDefinition_PASSPORT">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">= waitDuration</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="Task_CREDIT_REPORT" name="Получить КБКИ и проверить данные">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="loanflow-assessment-CREDIT_REPORT" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_PASSPORT_NEXT</bpmn:incoming>
+      <bpmn:incoming>Flow_CREDIT_REPORT_Resume</bpmn:incoming>
+      <bpmn:outgoing>Flow_CREDIT_REPORT_Route</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_CREDIT_REPORT" name="Исход этапа">
+      <bpmn:incoming>Flow_CREDIT_REPORT_Route</bpmn:incoming>
+      <bpmn:outgoing>Flow_CREDIT_REPORT_NEXT</bpmn:outgoing>
+      <bpmn:outgoing>Flow_CREDIT_REPORT_FINISH</bpmn:outgoing>
+      <bpmn:outgoing>Flow_CREDIT_REPORT_STOP</bpmn:outgoing>
+      <bpmn:outgoing>Flow_CREDIT_REPORT_WAIT</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_STOP_CREDIT_REPORT" name="Оценка остановлена">
+      <bpmn:incoming>Flow_CREDIT_REPORT_STOP</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:intermediateCatchEvent id="Timer_CREDIT_REPORT" name="Пауза / повтор">
+      <bpmn:incoming>Flow_CREDIT_REPORT_WAIT</bpmn:incoming>
+      <bpmn:outgoing>Flow_CREDIT_REPORT_Resume</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerDefinition_CREDIT_REPORT">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">= waitDuration</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="Task_FRAUD" name="Проверить антифрод и рассчитать условия">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="loanflow-assessment-FRAUD" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_CREDIT_REPORT_NEXT</bpmn:incoming>
+      <bpmn:incoming>Flow_FRAUD_Resume</bpmn:incoming>
+      <bpmn:outgoing>Flow_FRAUD_Route</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_FRAUD" name="Исход этапа">
+      <bpmn:incoming>Flow_FRAUD_Route</bpmn:incoming>
+      <bpmn:outgoing>Flow_FRAUD_NEXT</bpmn:outgoing>
+      <bpmn:outgoing>Flow_FRAUD_FINISH</bpmn:outgoing>
+      <bpmn:outgoing>Flow_FRAUD_STOP</bpmn:outgoing>
+      <bpmn:outgoing>Flow_FRAUD_WAIT</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_STOP_FRAUD" name="Оценка остановлена">
+      <bpmn:incoming>Flow_FRAUD_STOP</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:intermediateCatchEvent id="Timer_FRAUD" name="Пауза / повтор">
+      <bpmn:incoming>Flow_FRAUD_WAIT</bpmn:incoming>
+      <bpmn:outgoing>Flow_FRAUD_Resume</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerDefinition_FRAUD">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">= waitDuration</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="Task_DE" name="Подготовить рекомендацию DE">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="loanflow-assessment-DE" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_FRAUD_NEXT</bpmn:incoming>
+      <bpmn:incoming>Flow_DE_Resume</bpmn:incoming>
+      <bpmn:outgoing>Flow_DE_Route</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_DE" name="Исход этапа">
+      <bpmn:incoming>Flow_DE_Route</bpmn:incoming>
+      <bpmn:outgoing>Flow_DE_NEXT</bpmn:outgoing>
+      <bpmn:outgoing>Flow_DE_FINISH</bpmn:outgoing>
+      <bpmn:outgoing>Flow_DE_STOP</bpmn:outgoing>
+      <bpmn:outgoing>Flow_DE_WAIT</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_STOP_DE" name="Оценка остановлена">
+      <bpmn:incoming>Flow_DE_STOP</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:intermediateCatchEvent id="Timer_DE" name="Пауза / повтор">
+      <bpmn:incoming>Flow_DE_WAIT</bpmn:incoming>
+      <bpmn:outgoing>Flow_DE_Resume</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerDefinition_DE">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">= waitDuration</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="Task_FINALIZE" name="Зафиксировать результат и outbox">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="loanflow-assessment-finalize" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_AML_FINISH</bpmn:incoming>
+      <bpmn:incoming>Flow_PASSPORT_FINISH</bpmn:incoming>
+      <bpmn:incoming>Flow_CREDIT_REPORT_FINISH</bpmn:incoming>
+      <bpmn:incoming>Flow_FRAUD_FINISH</bpmn:incoming>
+      <bpmn:incoming>Flow_DE_NEXT</bpmn:incoming>
+      <bpmn:incoming>Flow_DE_FINISH</bpmn:incoming>
+      <bpmn:incoming>Flow_FINALIZE_Resume</bpmn:incoming>
+      <bpmn:outgoing>Flow_FINALIZE_Route</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_FINALIZE" name="Результат фиксации">
+      <bpmn:incoming>Flow_FINALIZE_Route</bpmn:incoming>
+      <bpmn:outgoing>Flow_FINALIZE_WAIT</bpmn:outgoing>
+      <bpmn:outgoing>Flow_FINALIZE_END</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateCatchEvent id="Timer_FINALIZE" name="Ожидать ядро">
+      <bpmn:incoming>Flow_FINALIZE_WAIT</bpmn:incoming>
+      <bpmn:outgoing>Flow_FINALIZE_Resume</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerDefinition_FINALIZE">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">= waitDuration</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:endEvent id="End" name="Оценка завершена">
+      <bpmn:incoming>Flow_FINALIZE_END</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_REGISTER_NEXT" sourceRef="Gateway_REGISTER" targetRef="Task_AML" name="Продолжить">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "NEXT"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_AML_Route" sourceRef="Task_AML" targetRef="Gateway_AML" />
+    <bpmn:sequenceFlow id="Flow_AML_NEXT" sourceRef="Gateway_AML" targetRef="Task_PASSPORT" name="Следующий этап">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "NEXT"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_AML_FINISH" sourceRef="Gateway_AML" targetRef="Task_FINALIZE" name="Результат готов">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "FINISH"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_AML_STOP" sourceRef="Gateway_AML" targetRef="End_STOP_AML" name="Остановить">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "STOP"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_AML_WAIT" sourceRef="Gateway_AML" targetRef="Timer_AML" name="Ожидать">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "WAIT"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_AML_Resume" sourceRef="Timer_AML" targetRef="Task_AML" />
+    <bpmn:sequenceFlow id="Flow_PASSPORT_Route" sourceRef="Task_PASSPORT" targetRef="Gateway_PASSPORT" />
+    <bpmn:sequenceFlow id="Flow_PASSPORT_NEXT" sourceRef="Gateway_PASSPORT" targetRef="Task_CREDIT_REPORT" name="Следующий этап">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "NEXT"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_PASSPORT_FINISH" sourceRef="Gateway_PASSPORT" targetRef="Task_FINALIZE" name="Результат готов">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "FINISH"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_PASSPORT_STOP" sourceRef="Gateway_PASSPORT" targetRef="End_STOP_PASSPORT" name="Остановить">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "STOP"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_PASSPORT_WAIT" sourceRef="Gateway_PASSPORT" targetRef="Timer_PASSPORT" name="Ожидать">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "WAIT"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_PASSPORT_Resume" sourceRef="Timer_PASSPORT" targetRef="Task_PASSPORT" />
+    <bpmn:sequenceFlow id="Flow_CREDIT_REPORT_Route" sourceRef="Task_CREDIT_REPORT" targetRef="Gateway_CREDIT_REPORT" />
+    <bpmn:sequenceFlow id="Flow_CREDIT_REPORT_NEXT" sourceRef="Gateway_CREDIT_REPORT" targetRef="Task_FRAUD" name="Следующий этап">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "NEXT"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_CREDIT_REPORT_FINISH" sourceRef="Gateway_CREDIT_REPORT" targetRef="Task_FINALIZE" name="Результат готов">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "FINISH"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_CREDIT_REPORT_STOP" sourceRef="Gateway_CREDIT_REPORT" targetRef="End_STOP_CREDIT_REPORT" name="Остановить">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "STOP"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_CREDIT_REPORT_WAIT" sourceRef="Gateway_CREDIT_REPORT" targetRef="Timer_CREDIT_REPORT" name="Ожидать">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "WAIT"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_CREDIT_REPORT_Resume" sourceRef="Timer_CREDIT_REPORT" targetRef="Task_CREDIT_REPORT" />
+    <bpmn:sequenceFlow id="Flow_FRAUD_Route" sourceRef="Task_FRAUD" targetRef="Gateway_FRAUD" />
+    <bpmn:sequenceFlow id="Flow_FRAUD_NEXT" sourceRef="Gateway_FRAUD" targetRef="Task_DE" name="Следующий этап">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "NEXT"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_FRAUD_FINISH" sourceRef="Gateway_FRAUD" targetRef="Task_FINALIZE" name="Результат готов">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "FINISH"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_FRAUD_STOP" sourceRef="Gateway_FRAUD" targetRef="End_STOP_FRAUD" name="Остановить">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "STOP"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_FRAUD_WAIT" sourceRef="Gateway_FRAUD" targetRef="Timer_FRAUD" name="Ожидать">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "WAIT"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_FRAUD_Resume" sourceRef="Timer_FRAUD" targetRef="Task_FRAUD" />
+    <bpmn:sequenceFlow id="Flow_DE_Route" sourceRef="Task_DE" targetRef="Gateway_DE" />
+    <bpmn:sequenceFlow id="Flow_DE_NEXT" sourceRef="Gateway_DE" targetRef="Task_FINALIZE" name="Следующий этап">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "NEXT"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_DE_FINISH" sourceRef="Gateway_DE" targetRef="Task_FINALIZE" name="Результат готов">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "FINISH"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_DE_STOP" sourceRef="Gateway_DE" targetRef="End_STOP_DE" name="Остановить">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "STOP"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_DE_WAIT" sourceRef="Gateway_DE" targetRef="Timer_DE" name="Ожидать">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "WAIT"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_DE_Resume" sourceRef="Timer_DE" targetRef="Task_DE" />
+    <bpmn:sequenceFlow id="Flow_FINALIZE_Route" sourceRef="Task_FINALIZE" targetRef="Gateway_FINALIZE" />
+    <bpmn:sequenceFlow id="Flow_FINALIZE_WAIT" sourceRef="Gateway_FINALIZE" targetRef="Timer_FINALIZE" name="Ожидать">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "WAIT"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_FINALIZE_Resume" sourceRef="Timer_FINALIZE" targetRef="Task_FINALIZE" />
+    <bpmn:sequenceFlow id="Flow_FINALIZE_END" sourceRef="Gateway_FINALIZE" targetRef="End" name="Завершить / остановить">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= route = "FINISH" or route = "STOP"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_Assessment">
+    <bpmndi:BPMNPlane id="Plane_Assessment" bpmnElement="loanflow-assessment">
+      <bpmndi:BPMNShape id="Start_di" bpmnElement="Start">
+        <dc:Bounds x="492" y="20" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="447" y="61" width="126" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_REGISTER_di" bpmnElement="Task_REGISTER">
+        <dc:Bounds x="430" y="95" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_REGISTER_di" bpmnElement="Gateway_REGISTER" isMarkerVisible="true">
+        <dc:Bounds x="485" y="215" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="345" y="200" width="125" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_REGISTER_di" bpmnElement="End_REGISTER">
+        <dc:Bounds x="690" y="222" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="645" y="263" width="126" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_AML_di" bpmnElement="Task_AML">
+        <dc:Bounds x="430" y="325" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_AML_di" bpmnElement="Gateway_AML" isMarkerVisible="true">
+        <dc:Bounds x="485" y="440" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="345" y="425" width="125" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_STOP_AML_di" bpmnElement="End_STOP_AML">
+        <dc:Bounds x="690" y="425" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="645" y="388" width="126" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Timer_AML_di" bpmnElement="Timer_AML">
+        <dc:Bounds x="782" y="502" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="737" y="543" width="126" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_PASSPORT_di" bpmnElement="Task_PASSPORT">
+        <dc:Bounds x="430" y="565" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_PASSPORT_di" bpmnElement="Gateway_PASSPORT" isMarkerVisible="true">
+        <dc:Bounds x="485" y="680" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="345" y="665" width="125" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_STOP_PASSPORT_di" bpmnElement="End_STOP_PASSPORT">
+        <dc:Bounds x="690" y="665" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="645" y="628" width="126" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Timer_PASSPORT_di" bpmnElement="Timer_PASSPORT">
+        <dc:Bounds x="782" y="742" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="737" y="783" width="126" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CREDIT_REPORT_di" bpmnElement="Task_CREDIT_REPORT">
+        <dc:Bounds x="430" y="805" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_CREDIT_REPORT_di" bpmnElement="Gateway_CREDIT_REPORT" isMarkerVisible="true">
+        <dc:Bounds x="485" y="920" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="345" y="905" width="125" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_STOP_CREDIT_REPORT_di" bpmnElement="End_STOP_CREDIT_REPORT">
+        <dc:Bounds x="690" y="905" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="645" y="868" width="126" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Timer_CREDIT_REPORT_di" bpmnElement="Timer_CREDIT_REPORT">
+        <dc:Bounds x="782" y="982" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="737" y="1023" width="126" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_FRAUD_di" bpmnElement="Task_FRAUD">
+        <dc:Bounds x="430" y="1045" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_FRAUD_di" bpmnElement="Gateway_FRAUD" isMarkerVisible="true">
+        <dc:Bounds x="485" y="1160" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="345" y="1145" width="125" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_STOP_FRAUD_di" bpmnElement="End_STOP_FRAUD">
+        <dc:Bounds x="690" y="1145" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="645" y="1108" width="126" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Timer_FRAUD_di" bpmnElement="Timer_FRAUD">
+        <dc:Bounds x="782" y="1222" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="737" y="1263" width="126" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_DE_di" bpmnElement="Task_DE">
+        <dc:Bounds x="430" y="1285" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_DE_di" bpmnElement="Gateway_DE" isMarkerVisible="true">
+        <dc:Bounds x="485" y="1400" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="345" y="1385" width="125" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_STOP_DE_di" bpmnElement="End_STOP_DE">
+        <dc:Bounds x="690" y="1385" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="645" y="1348" width="126" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Timer_DE_di" bpmnElement="Timer_DE">
+        <dc:Bounds x="782" y="1462" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="737" y="1503" width="126" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_FINALIZE_di" bpmnElement="Task_FINALIZE">
+        <dc:Bounds x="430" y="1525" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_FINALIZE_di" bpmnElement="Gateway_FINALIZE" isMarkerVisible="true">
+        <dc:Bounds x="485" y="1640" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="345" y="1625" width="125" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Timer_FINALIZE_di" bpmnElement="Timer_FINALIZE">
+        <dc:Bounds x="782" y="1702" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="737" y="1743" width="126" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_di" bpmnElement="End">
+        <dc:Bounds x="492" y="1800" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="447" y="1841" width="126" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_Start_REGISTER_di" bpmnElement="Flow_Start_REGISTER">
+        <di:waypoint x="510" y="56" />
+        <di:waypoint x="510" y="95" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_REGISTER_Route_di" bpmnElement="Flow_REGISTER_Route">
+        <di:waypoint x="510" y="175" />
+        <di:waypoint x="510" y="215" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_REGISTER_STOP_di" bpmnElement="Flow_REGISTER_STOP">
+        <di:waypoint x="535" y="240" />
+        <di:waypoint x="690" y="240" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="568" y="218" width="90" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_REGISTER_NEXT_di" bpmnElement="Flow_REGISTER_NEXT">
+        <di:waypoint x="510" y="265" />
+        <di:waypoint x="510" y="325" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="522" y="286" width="95" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AML_Route_di" bpmnElement="Flow_AML_Route">
+        <di:waypoint x="510" y="405" />
+        <di:waypoint x="510" y="440" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AML_NEXT_di" bpmnElement="Flow_AML_NEXT">
+        <di:waypoint x="510" y="490" />
+        <di:waypoint x="510" y="565" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="522" y="508" width="120" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AML_FINISH_di" bpmnElement="Flow_AML_FINISH">
+        <di:waypoint x="485" y="465" />
+        <di:waypoint x="150" y="465" />
+        <di:waypoint x="150" y="1480" />
+        <di:waypoint x="450" y="1480" />
+        <di:waypoint x="450" y="1525" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="158" y="443" width="120" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AML_STOP_di" bpmnElement="Flow_AML_STOP">
+        <di:waypoint x="532" y="462" />
+        <di:waypoint x="610" y="462" />
+        <di:waypoint x="610" y="443" />
+        <di:waypoint x="690" y="443" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="550" y="417" width="90" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AML_WAIT_di" bpmnElement="Flow_AML_WAIT">
+        <di:waypoint x="532" y="473" />
+        <di:waypoint x="735" y="473" />
+        <di:waypoint x="735" y="520" />
+        <di:waypoint x="782" y="520" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="645" y="531" width="75" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AML_Resume_di" bpmnElement="Flow_AML_Resume">
+        <di:waypoint x="818" y="520" />
+        <di:waypoint x="880" y="520" />
+        <di:waypoint x="880" y="365" />
+        <di:waypoint x="590" y="365" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="700" y="340" width="120" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PASSPORT_Route_di" bpmnElement="Flow_PASSPORT_Route">
+        <di:waypoint x="510" y="645" />
+        <di:waypoint x="510" y="680" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PASSPORT_NEXT_di" bpmnElement="Flow_PASSPORT_NEXT">
+        <di:waypoint x="510" y="730" />
+        <di:waypoint x="510" y="805" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="522" y="748" width="120" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PASSPORT_FINISH_di" bpmnElement="Flow_PASSPORT_FINISH">
+        <di:waypoint x="485" y="705" />
+        <di:waypoint x="195" y="705" />
+        <di:waypoint x="195" y="1488" />
+        <di:waypoint x="475" y="1488" />
+        <di:waypoint x="475" y="1525" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="203" y="683" width="120" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PASSPORT_STOP_di" bpmnElement="Flow_PASSPORT_STOP">
+        <di:waypoint x="532" y="702" />
+        <di:waypoint x="610" y="702" />
+        <di:waypoint x="610" y="683" />
+        <di:waypoint x="690" y="683" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="550" y="657" width="90" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PASSPORT_WAIT_di" bpmnElement="Flow_PASSPORT_WAIT">
+        <di:waypoint x="532" y="713" />
+        <di:waypoint x="735" y="713" />
+        <di:waypoint x="735" y="760" />
+        <di:waypoint x="782" y="760" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="645" y="771" width="75" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PASSPORT_Resume_di" bpmnElement="Flow_PASSPORT_Resume">
+        <di:waypoint x="818" y="760" />
+        <di:waypoint x="880" y="760" />
+        <di:waypoint x="880" y="605" />
+        <di:waypoint x="590" y="605" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="700" y="580" width="120" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CREDIT_REPORT_Route_di" bpmnElement="Flow_CREDIT_REPORT_Route">
+        <di:waypoint x="510" y="885" />
+        <di:waypoint x="510" y="920" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CREDIT_REPORT_NEXT_di" bpmnElement="Flow_CREDIT_REPORT_NEXT">
+        <di:waypoint x="510" y="970" />
+        <di:waypoint x="510" y="1045" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="522" y="988" width="120" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CREDIT_REPORT_FINISH_di" bpmnElement="Flow_CREDIT_REPORT_FINISH">
+        <di:waypoint x="485" y="945" />
+        <di:waypoint x="240" y="945" />
+        <di:waypoint x="240" y="1496" />
+        <di:waypoint x="500" y="1496" />
+        <di:waypoint x="500" y="1525" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="248" y="923" width="120" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CREDIT_REPORT_STOP_di" bpmnElement="Flow_CREDIT_REPORT_STOP">
+        <di:waypoint x="532" y="942" />
+        <di:waypoint x="610" y="942" />
+        <di:waypoint x="610" y="923" />
+        <di:waypoint x="690" y="923" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="550" y="897" width="90" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CREDIT_REPORT_WAIT_di" bpmnElement="Flow_CREDIT_REPORT_WAIT">
+        <di:waypoint x="532" y="953" />
+        <di:waypoint x="735" y="953" />
+        <di:waypoint x="735" y="1000" />
+        <di:waypoint x="782" y="1000" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="645" y="1011" width="75" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CREDIT_REPORT_Resume_di" bpmnElement="Flow_CREDIT_REPORT_Resume">
+        <di:waypoint x="818" y="1000" />
+        <di:waypoint x="880" y="1000" />
+        <di:waypoint x="880" y="845" />
+        <di:waypoint x="590" y="845" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="700" y="820" width="120" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FRAUD_Route_di" bpmnElement="Flow_FRAUD_Route">
+        <di:waypoint x="510" y="1125" />
+        <di:waypoint x="510" y="1160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FRAUD_NEXT_di" bpmnElement="Flow_FRAUD_NEXT">
+        <di:waypoint x="510" y="1210" />
+        <di:waypoint x="510" y="1285" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="522" y="1228" width="120" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FRAUD_FINISH_di" bpmnElement="Flow_FRAUD_FINISH">
+        <di:waypoint x="485" y="1185" />
+        <di:waypoint x="285" y="1185" />
+        <di:waypoint x="285" y="1504" />
+        <di:waypoint x="525" y="1504" />
+        <di:waypoint x="525" y="1525" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="293" y="1163" width="120" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FRAUD_STOP_di" bpmnElement="Flow_FRAUD_STOP">
+        <di:waypoint x="532" y="1182" />
+        <di:waypoint x="610" y="1182" />
+        <di:waypoint x="610" y="1163" />
+        <di:waypoint x="690" y="1163" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="550" y="1137" width="90" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FRAUD_WAIT_di" bpmnElement="Flow_FRAUD_WAIT">
+        <di:waypoint x="532" y="1193" />
+        <di:waypoint x="735" y="1193" />
+        <di:waypoint x="735" y="1240" />
+        <di:waypoint x="782" y="1240" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="645" y="1251" width="75" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FRAUD_Resume_di" bpmnElement="Flow_FRAUD_Resume">
+        <di:waypoint x="818" y="1240" />
+        <di:waypoint x="880" y="1240" />
+        <di:waypoint x="880" y="1085" />
+        <di:waypoint x="590" y="1085" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="700" y="1060" width="120" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DE_Route_di" bpmnElement="Flow_DE_Route">
+        <di:waypoint x="510" y="1365" />
+        <di:waypoint x="510" y="1400" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DE_NEXT_di" bpmnElement="Flow_DE_NEXT">
+        <di:waypoint x="510" y="1450" />
+        <di:waypoint x="510" y="1525" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="522" y="1468" width="120" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DE_FINISH_di" bpmnElement="Flow_DE_FINISH">
+        <di:waypoint x="485" y="1425" />
+        <di:waypoint x="330" y="1425" />
+        <di:waypoint x="330" y="1512" />
+        <di:waypoint x="550" y="1512" />
+        <di:waypoint x="550" y="1525" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="338" y="1403" width="120" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DE_STOP_di" bpmnElement="Flow_DE_STOP">
+        <di:waypoint x="532" y="1422" />
+        <di:waypoint x="610" y="1422" />
+        <di:waypoint x="610" y="1403" />
+        <di:waypoint x="690" y="1403" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="550" y="1377" width="90" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DE_WAIT_di" bpmnElement="Flow_DE_WAIT">
+        <di:waypoint x="532" y="1433" />
+        <di:waypoint x="735" y="1433" />
+        <di:waypoint x="735" y="1480" />
+        <di:waypoint x="782" y="1480" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="645" y="1491" width="75" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DE_Resume_di" bpmnElement="Flow_DE_Resume">
+        <di:waypoint x="818" y="1480" />
+        <di:waypoint x="880" y="1480" />
+        <di:waypoint x="880" y="1325" />
+        <di:waypoint x="590" y="1325" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="700" y="1300" width="120" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FINALIZE_Route_di" bpmnElement="Flow_FINALIZE_Route">
+        <di:waypoint x="510" y="1605" />
+        <di:waypoint x="510" y="1640" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FINALIZE_WAIT_di" bpmnElement="Flow_FINALIZE_WAIT">
+        <di:waypoint x="535" y="1665" />
+        <di:waypoint x="735" y="1665" />
+        <di:waypoint x="735" y="1720" />
+        <di:waypoint x="782" y="1720" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="642" y="1672" width="80" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FINALIZE_Resume_di" bpmnElement="Flow_FINALIZE_Resume">
+        <di:waypoint x="818" y="1720" />
+        <di:waypoint x="880" y="1720" />
+        <di:waypoint x="880" y="1565" />
+        <di:waypoint x="590" y="1565" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FINALIZE_END_di" bpmnElement="Flow_FINALIZE_END">
+        <di:waypoint x="510" y="1690" />
+        <di:waypoint x="510" y="1800" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="525" y="1743" width="170" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

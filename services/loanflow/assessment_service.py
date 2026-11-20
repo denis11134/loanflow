@@ -67,12 +67,20 @@ def accept_request(db, payload, clock):
     existing = store.one(db, "SELECT * FROM assessment_task WHERE application_id=%s", (application_id,))
     if existing:
         return None if bytes(existing["request_fingerprint"]) == fingerprint else "REQUEST_CONFLICT"
+    engine = assessment_engine()
     db.execute("""INSERT INTO assessment_task
-                  (application_id,submitted_at,request_fingerprint,inputs,stage,run_at)
-                  VALUES (%s,%s,%s,%s,'AML',%s)""",
+                  (application_id,submitted_at,request_fingerprint,inputs,stage,run_at,engine)
+                  VALUES (%s,%s,%s,%s,'AML',%s,%s)""",
                (application_id, event_bus.timestamp(payload["submitted_at"]), fingerprint,
-                Jsonb(payload["inputs"]), clock()))
+                Jsonb(payload["inputs"]), clock(), engine))
     return None
+
+
+def assessment_engine():
+    engine = os.environ.get("LOANFLOW_ASSESSMENT_ENGINE", "local")
+    if engine not in ("local", "camunda"):
+        raise ValueError("Unknown assessment engine")
+    return engine
 
 
 def reject(reason):
@@ -119,7 +127,8 @@ class AssessmentService:
     def run_once(self):
         with store.connect(self.dsn) as db:
             task = store.one(db, """SELECT * FROM assessment_task
-                                    WHERE stage IN ('AML','PASSPORT','CREDIT_REPORT','FRAUD','DE')
+                                    WHERE engine='local'
+                                    AND stage IN ('AML','PASSPORT','CREDIT_REPORT','FRAUD','DE')
                                     AND run_at<=%s ORDER BY run_at,application_id
                                     FOR UPDATE SKIP LOCKED LIMIT 1""", (self.clock(),))
             if task is None:
