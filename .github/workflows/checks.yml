@@ -96,3 +96,58 @@ jobs:
         with:
           name: kafka-results
           path: test-results/
+  camunda:
+    name: Camunda 8 Run, PostgreSQL и Kafka без Docker
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PG_BINDIR: /usr/lib/postgresql/18/bin
+      KAFKA_HOME: ${{ github.workspace }}/.cache/kafka_2.13-4.1.1
+      CAMUNDA_HOME: ${{ github.workspace }}/.cache/camunda-8.10.9/c8run-8.10.9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: python -m pip install -r requirements-checks.txt
+      - name: PostgreSQL 18
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl --fail --silent --show-error https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          echo 'deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main' | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-18 fonts-dejavu-core
+      - name: Apache Kafka 4.1.1
+        run: |
+          mkdir -p .cache
+          curl --fail --location --retry 3 https://archive.apache.org/dist/kafka/4.1.1/kafka_2.13-4.1.1.tgz -o .cache/kafka.tgz
+          curl --fail --location --retry 3 https://archive.apache.org/dist/kafka/4.1.1/kafka_2.13-4.1.1.tgz.sha512 -o .cache/kafka.tgz.sha512
+          python scripts/verify_kafka_archive.py .cache/kafka.tgz .cache/kafka.tgz.sha512
+          tar -xzf .cache/kafka.tgz -C .cache
+      - name: Camunda 8 Run 8.10.9 и закреплённая SHA-256
+        run: python scripts/prepare_camunda.py
+      - name: Проверка compose overlay
+        env:
+          LOANFLOW_SECRET: ci-config-validation
+          LOANFLOW_ABS_TOKEN: ci-config-validation
+          LOANFLOW_ASSESSMENT_TOKEN: ci-config-validation
+          LOANFLOW_ASSESSMENT_SECRET: ci-config-validation
+        run: docker compose -f compose.yaml -f compose.camunda.yaml config --quiet
+      - name: Приёмка 5.4 с обязательными настоящими движком и брокером
+        run: python -m pytest -q --tb=short tests/test_camunda.py --require-camunda --require-kafka --basetemp=test-results/camunda-runtime --junitxml=test-results/camunda.xml
+      - name: Сборка образа и проверка ресурсов оценки
+        run: |
+          docker build -f services/Dockerfile -t loanflow-stand:ci .
+          docker run --rm loanflow-stand:ci python -c 'from services.loanflow import event_bus, store; import xml.etree.ElementTree as E; event_bus.validator(event_bus.REQUEST_TOPIC); event_bus.validator(event_bus.RESULT_TOPIC); E.parse(store.ROOT / "diagrams/loanflow-assessment.bpmn")'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: camunda-results
+          path: |
+            test-results/camunda.xml
+            test-results/camunda-runtime/**/run.log
+            test-results/camunda-runtime/**/camunda.log

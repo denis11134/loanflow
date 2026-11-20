@@ -6,6 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def pytest_addoption(parser):
+    parser.addoption('--require-camunda', action='store_true', help='Требовать настоящий движок Camunda для приёмки 5.4')
     parser.addoption('--require-kafka', action='store_true', help='Требовать живой Kafka для приёмки 5.3')
     parser.addoption('--require-ready', action='store_true',
                      help='Завершаться с кодом 1 при ожидаемых дефектах контрактов')
