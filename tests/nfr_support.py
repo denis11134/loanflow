@@ -148,8 +148,9 @@ class Runtime:
                 if not path.name.isdigit():
                     continue
                 try:
-                    if ((path/"comm").read_text().strip() == "java"
-                            and marker in (path/"environ").read_bytes().split(b"\0")):
+                    # Уникальная среда принадлежит только этому c8run и его потомкам.
+                    # Нативное имя главного потока JVM не является идентификатором процесса.
+                    if marker in (path/"environ").read_bytes().split(b"\0"):
                         os.kill(int(path.name), signal.SIGKILL)
                         killed += 1
                 except (OSError, PermissionError):
@@ -167,7 +168,9 @@ class Runtime:
                   45, "Не восстановился Kafka")
         elif component.endswith("_database"):
             params, run = self.database_controls[component.removesuffix("_database")]
-            run("pg_ctl", "-D", Path(params["host"])/"data", "-l", Path(params["host"])/"postgres.log", "-w", "start")
+            # Именно restart повторно читает postmaster.opts: отдельный Unix-сокет,
+            # отключённый TCP и маскирование журналов должны сохраниться после аварии.
+            run("pg_ctl", "-D", Path(params["host"])/"data", "-l", Path(params["host"])/"postgres.log", "-w", "restart")
         elif component == "camunda":
             self.start_engine()
         until(self.ready, 30, "Зависимости не готовы после восстановления")
