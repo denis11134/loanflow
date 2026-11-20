@@ -12,7 +12,7 @@ import platform
 import shutil
 import subprocess
 import sys
-from threading import Lock
+from threading import Event, Lock, Thread
 import time
 from uuid import uuid4
 
@@ -22,6 +22,19 @@ from nfr_support import Runtime, until
 from services.loanflow import event_bus
 
 COMPONENTS = ("api", "core", "assessment", "kafka", "camunda", "core_database", "assessment_database")
+
+
+def previous_processes(runtime_root):
+    marker = b"LOANFLOW_NFR_RUNTIME_ROOT="+str(runtime_root.resolve()).encode()
+    count = 0
+    for path in Path("/proc").iterdir():
+        if not path.name.isdigit() or int(path.name) == os.getpid():
+            continue
+        try:
+            count += marker in (path/"environ").read_bytes().split(b"\0")
+        except (OSError, PermissionError):
+            continue
+    return count
 
 
 def resources():
@@ -44,6 +57,39 @@ def percentile(values, q):
 def distribution(values):
     return {"count": len(values), "p50_seconds": percentile(values,.5), "p90_seconds": percentile(values,.9),
             "p95_seconds": percentile(values,.95), "p99_seconds": percentile(values,.99), "max_seconds": max(values)}
+
+
+class Sampler:
+    """Обычный опрос диагностики продолжает работать во время замера нагрузки."""
+    def __init__(self, runtime):
+        self.runtime = runtime
+        self.stop = Event()
+        self.result = {"interval_seconds": 5, "cycles": 0, "errors": 0}
+
+    def run(self):
+        def probe(port):
+            try:
+                code, payload, _ = self.runtime.http("GET", "/internal/diagnostics", port=port, monitor=True)
+                return code == 200 and payload["workflow_ready"]
+            except Exception:
+                return False
+        with ThreadPoolExecutor(3) as pool:
+            while not self.stop.is_set():
+                began = time.monotonic()
+                ports = (self.runtime.api_port, self.runtime.core_monitor_port, self.runtime.assessment_monitor_port)
+                self.result["errors"] += sum(not result for result in pool.map(probe, ports))
+                self.result["cycles"] += 1
+                self.stop.wait(max(0, 5-(time.monotonic()-began)))
+
+    def __enter__(self):
+        self.thread = Thread(target=self.run, daemon=True)
+        self.thread.start()
+        return self
+
+    def __exit__(self, *_):
+        self.stop.set()
+        self.thread.join(3)
+        assert not self.thread.is_alive(), "Не завершился диагностический опрос"
 
 
 def api_measurement(runtime, drafts):
@@ -277,9 +323,12 @@ def main():
 
     try:
         save()
+        report["previous_task_processes"] = previous_processes(args.runtime)
+        assert report["previous_task_processes"] == 0, "Остались процессы прежнего измерения"
         assert before["memory_available_mb"] >= 4096, "Недостаточно RAM для тяжёлой приёмки (нужно 4096 MiB available)"
         assert before["disk_free_mb"] >= 4096 and before["tmp_free_mb"] >= 1024, "Недостаточно диска для приёмки"
         assert not args.runtime.exists(), "Каталог измерений уже существует; выберите новый --runtime"
+        os.environ["LOANFLOW_NFR_RUNTIME_ROOT"] = str(args.runtime.resolve())
         for iteration in range(1,4):
             result = {"iteration": iteration, "complete": False, "resources_before": resources(), "failures": []}
             report["runs"].append(result)
@@ -294,12 +343,16 @@ def main():
                 while time.monotonic() < warm_until:
                     assert runtime.http("GET", "/applications/"+drafts[0][1], drafts[0][0])[0] == 200
                     time.sleep(.1)
-                result["api"] = api_measurement(runtime, drafts)
-                save()
-                assert result["api"]["passed"], "Не пройдены цели API"
-                result["automatic"] = automatic_measurement(runtime, drafts[:100])
-                save()
-                assert result["automatic"]["passed"], "Не пройдены цели автооценки"
+                with Sampler(runtime) as sampler:
+                    result["monitoring"] = sampler.result
+                    result["api"] = api_measurement(runtime, drafts)
+                    save()
+                    assert result["api"]["passed"], "Не пройдены цели API"
+                    result["automatic"] = automatic_measurement(runtime, drafts[:100])
+                    save()
+                    assert result["automatic"]["passed"], "Не пройдены цели автооценки"
+                assert result["monitoring"]["errors"] == 0, "Диагностика недоступна под штатной нагрузкой"
+                assert result["monitoring"]["cycles"] >= 36, "Неполный опрос диагностики под нагрузкой"
                 result["stalled"] = stalled_measurement(runtime)
                 for number, component in enumerate(COMPONENTS):
                     failure = failure_measurement(runtime, component, 100+number*10)
