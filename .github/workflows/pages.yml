@@ -1,0 +1,140 @@
+name: Публикация документации
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'overrides/**'
+      - 'mkdocs.yml'
+      - 'requirements-docs.txt'
+      - 'requirements-pages.txt'
+      - 'requirements-checks.lock.txt'
+      - 'scripts/build_docs.py'
+      - 'scripts/check_site*.py'
+      - 'tests/test_docs.py'
+      - 'tests/test_site_publication.py'
+      - '.github/workflows/pages.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'overrides/**'
+      - 'mkdocs.yml'
+      - 'requirements-docs.txt'
+      - 'requirements-pages.txt'
+      - 'requirements-checks.lock.txt'
+      - 'scripts/build_docs.py'
+      - 'scripts/check_site*.py'
+      - 'tests/test_docs.py'
+      - 'tests/test_site_publication.py'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Активное развёртывание не прерывается. Более новые pending-запуски заменяют старые.
+concurrency:
+  group: pages-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Строгая сборка и проверка /loanflow/
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            requirements-pages.txt
+            requirements-docs.txt
+            requirements-checks.lock.txt
+      - run: python -m pip install -r requirements-pages.txt
+      - run: python -m playwright install --with-deps chromium
+      - name: Проверки ссылок и границы публичного artifact
+        run: python -m pytest -q --tb=short tests/test_docs.py tests/test_site_publication.py
+      - name: Сборка только из отслеживаемого коммита
+        run: python scripts/build_docs.py
+      - run: python scripts/check_site.py site
+      - name: Браузерная проверка под проектным префиксом
+        run: python scripts/check_site_browser.py --site site --expected-sha "$GITHUB_SHA" --screenshots test-results/pages-local
+      - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: site
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pages-local-check
+          path: test-results/pages-local
+
+  deploy:
+    name: GitHub Pages
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      published: ${{ steps.current.outputs.publish }}
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Проверка актуальности коммита
+        id: current
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          if [ "$current" = "$GITHUB_SHA" ]; then
+            printf 'publish=true\n' >> "$GITHUB_OUTPUT"
+          else
+            printf 'publish=false\n' >> "$GITHUB_OUTPUT"
+            printf 'Устаревший запуск: публикация пропущена. Повторите workflow для текущего main.\n'
+          fi
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+        if: steps.current.outputs.publish == 'true'
+      - name: Публикация проверенного artifact
+        id: deployment
+        if: steps.current.outputs.publish == 'true'
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+
+  verify:
+    name: Проверка публичного сайта
+    needs: deploy
+    if: needs.deploy.outputs.published == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-pages.txt
+      - run: python -m playwright install --with-deps chromium
+      - name: HTTP, поиск, диаграммы, мобильное меню и статический прототип
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: python scripts/check_site_browser.py --url "$PAGE_URL" --expected-sha "$GITHUB_SHA" --screenshots test-results/pages-public
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pages-public-check
+          path: test-results/pages-public
