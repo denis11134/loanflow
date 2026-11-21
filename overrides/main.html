@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block scripts %}
+  {% if page and 'class="mermaid"' in page.content %}
+    <script src="{{ 'assets/vendor/mermaid-11.17.2.min.js' | url }}"></script>
+    <script src="{{ 'assets/javascripts/mermaid-runtime.js' | url }}"></script>
+  {% endif %}
+  {{ super() }}
+{% endblock %}

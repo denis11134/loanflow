@@ -47,7 +47,10 @@ def test_docs_build_navigation_and_links(tmp_path):
             url = urlsplit(href)
             if url.scheme or url.netloc or not url.path and not url.fragment:
                 continue
-            target = ((site / unquote(url.path).lstrip('/')) if url.path.startswith('/')
+            prefix = urlsplit(config['site_url']).path
+            if url.path.startswith('/'):
+                assert url.path.startswith(prefix), (str(page.relative_to(site)), href)
+            target = ((site / unquote(url.path)[len(prefix):]) if url.path.startswith('/')
                       else page.parent / unquote(url.path)).resolve() if url.path else page
             if target.is_dir():
                 target /= 'index.html'

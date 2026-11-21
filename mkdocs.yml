@@ -1,11 +1,17 @@
 site_name: LoanFlow
 site_description: Учебный кредитный конвейер для потребительских кредитов
+site_url: https://denis11134.github.io/loanflow/
+repo_url: https://github.com/denis11134/loanflow
+repo_name: denis11134/loanflow
+edit_uri: blob/main/docs/
 docs_dir: docs
 site_dir: site
 
 theme:
   name: material
+  custom_dir: overrides
   language: ru
+  font: false
   features:
     - navigation.sections
     - navigation.indexes
@@ -31,6 +37,11 @@ plugins:
       lang:
         - ru
         - en
+
+extra_css:
+  - assets/stylesheets/diagrams.css
+extra_javascript:
+  - assets/javascripts/diagrams.js
 
 markdown_extensions:
   - admonition
