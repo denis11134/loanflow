@@ -1,0 +1,4 @@
+-c requirements-checks.lock.txt
+-r requirements-docs.txt
+pytest==9.0.2
+playwright==1.58.0
