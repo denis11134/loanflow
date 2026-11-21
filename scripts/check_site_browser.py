@@ -194,7 +194,7 @@ def check(base, screenshots, expected_sha=None):
         expect(page.locator("h1")).to_contain_text("Требования")
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
         page.screenshot(path=str(screenshots/"mobile.png"), full_page=True)
-        response = page.goto(urljoin(base, "08-prototypes/loanflow-demo.html"), wait_until="domcontentloaded")
+        response = page.goto(urljoin(base, "08-prototypes/loanflow-demo.html")+"#375", wait_until="domcontentloaded")
         assert response.status == 200
         prototype = page.evaluate((ROOT/"tests/prototype_journey.js").read_text())
         assert prototype["passed"] > 0
