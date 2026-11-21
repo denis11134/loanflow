@@ -155,6 +155,7 @@ def check(base, screenshots, expected_sha=None):
         expect(page.locator(".md-search-result__list")).to_contain_text("самозапрет", ignore_case=True)
         result = page.locator(".md-search-result__link").first
         result.click()
+        page.wait_for_load_state("networkidle")
         expect(page.locator("h1")).to_be_visible()
         assert page.url.startswith(base)
 
@@ -191,6 +192,7 @@ def check(base, screenshots, expected_sha=None):
         if not toggle.is_checked():
             section.click()
         page.locator(".md-nav--primary").get_by_role("link", name="1.6. Требования MVP", exact=True).click()
+        page.wait_for_load_state("networkidle")
         expect(page.locator("h1")).to_contain_text("Требования")
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
         page.screenshot(path=str(screenshots/"mobile.png"), full_page=True)
