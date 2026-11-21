@@ -2,6 +2,8 @@
 
 Учебный кредитный конвейер для зарплатных клиентов российского банка. Портфолио системного аналитика.
 
+[Документация](https://denis11134.github.io/loanflow/) · [Статический прототип](https://denis11134.github.io/loanflow/08-prototypes/loanflow-demo.html)
+
 [Бэклог и план](https://github.com/users/denis11134/projects/1) · [Результаты закрепления и единое ревью](docs/verification.md)
 
 ## Фактическое состояние
@@ -309,3 +311,50 @@ PG_BINDIR=/usr/lib/postgresql/18/bin KAFKA_HOME="$PWD/.cache/kafka_2.13-4.1.1" C
 Нужны минимум 4 GiB доступной RAM, 4 GiB свободного диска проекта и 1 GiB в `/tmp`.
 Для каждого запуска нужен новый каталог `--runtime`; отчёт `test-results/nfr.json`
 содержит три последовательных измерения, а неполный запуск имеет `passed=false`.
+
+## Публикация документации
+
+Публичный сайт: <https://denis11134.github.io/loanflow/>. GitHub Pages публикует
+MkDocs и согласованный статический прототип. Исходники API, SQL и BPMN доступны
+по ссылкам на репозиторий. Серверный стенд запускается отдельно по инструкции выше.
+
+Workflow `.github/workflows/pages.yml` запускается при изменениях сайта в `main`.
+Для повторной публикации откройте **Actions → Публикация документации → Run workflow**
+и выберите `main`. В **Settings → Pages → Source** используется **GitHub Actions**;
+окружение `github-pages` допускает развёртывания только из `main`.
+
+Перед публикацией выполняются строгая сборка, проверка меню, ресурсов и ссылок под
+`/loanflow/`, русский поиск, Mermaid, мобильная навигация и сценарий прототипа.
+После развёртывания те же браузерные проверки идут по публичному адресу.
+`build-info.json` содержит SHA опубликованного источника. Скриншоты сохраняются
+отдельными Actions artifacts, в сайт они не входят.
+
+Сборка берёт только `docs/`, `mkdocs.yml` и шаблон `overrides/` из отслеживаемого коммита через `git archive`.
+Локальные правки, `.env`, `.cache`, токены, базы, логи, отчёты и рабочий МП в artifact
+не копируются. Активные публикации сериализованы; устаревший SHA пропускается.
+Если во время сборки `main` обновился, повторите запуск для текущего `main`.
+Mermaid 11.17.2 хранится в `docs/assets/vendor/` с лицензией и контрольной суммой;
+схемы загружаются с самого сайта. Для текста используются системные шрифты.
+
+Локальный просмотр текущих изменений:
+
+```bash
+.venv/bin/python -m pip install -c requirements-checks.lock.txt -r requirements-docs.txt
+.venv/bin/python -m mkdocs serve --dev-addr 127.0.0.1:8020
+```
+
+Откройте <http://127.0.0.1:8020/loanflow/>. Для точного воспроизведения публикационного
+build сначала сохраните изменения коммитом:
+
+```bash
+.venv/bin/python scripts/build_docs.py
+.venv/bin/python scripts/check_site.py site
+```
+
+Браузерная проверка требует `requirements-pages.txt` и Chromium Playwright:
+
+```bash
+.venv/bin/python -m pip install -r requirements-pages.txt
+.venv/bin/python -m playwright install chromium
+.venv/bin/python scripts/check_site_browser.py --site site
+```
