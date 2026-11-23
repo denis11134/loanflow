@@ -1,0 +1,534 @@
+{
+  "schema": 1,
+  "description": "Сводка существующей приёмки 5.5. Индивидуальные latency-сэмплы исключены; значения агрегатов сохранены без округления.",
+  "source": {
+    "workflow_run": "https://github.com/denis11134/loanflow/actions/runs/44795252394",
+    "artifact_id": 14662070474,
+    "artifact_name": "nfr-results",
+    "artifact_expires_at": "2027-02-18T18:42:10Z",
+    "file": "nfr.json",
+    "sha256": "ff20b41a092b602278100048fd901402b691cf094e681ec440db9521400ecea4"
+  },
+  "sha": "8c179465e5a59cb1ea38cabfbed28e08ad02d5b1",
+  "started_at": "2026-11-20T18:56:19.123753+00:00",
+  "finished_at": "2026-11-20T19:22:00.179721+00:00",
+  "complete": true,
+  "passed": true,
+  "environment": {
+    "python": "3.12.16",
+    "platform": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.39",
+    "versions": {
+      "fastapi": "0.135.2",
+      "uvicorn": "0.41.0",
+      "psycopg": "3.3.3",
+      "confluent-kafka": "2.16.1"
+    },
+    "kafka": "4.1.1",
+    "camunda": "8.10.9",
+    "camunda_job_lease_ms": 30000,
+    "resources": {
+      "cpu_count": 4,
+      "memory_total_mb": 15983,
+      "memory_available_mb": 14935,
+      "swap_used_mb": 0,
+      "disk_free_mb": 84307,
+      "tmp_free_mb": 84307,
+      "load": [
+        0.525390625,
+        0.271484375,
+        0.11376953125
+      ]
+    },
+    "cpu_model": "AMD EPYC 7763 64-Core Processor",
+    "java": "openjdk version \"21.0.13\" 2026-10-20 LTS",
+    "camunda_java_opts": "-Xms128m -Xmx768m -XX:MaxDirectMemorySize=128m -XX:ActiveProcessorCount=2",
+    "kafka_heap": "-Xms128m -Xmx256m",
+    "fixture_version": "nfr-v1-1000-20pct-aml",
+    "warmup_seconds": 30
+  },
+  "runs": [
+    {
+      "iteration": 1,
+      "complete": true,
+      "postgres_version": "18.7 (Ubuntu 18.7-1.pgdg24.04+5)",
+      "cold_start_seconds": 13.803313478999996,
+      "monitoring": {
+        "interval_seconds": 5,
+        "cycles": 45,
+        "errors": 0
+      },
+      "stalled": {
+        "detection_after_threshold_seconds": 4.421120911000003,
+        "passed": true
+      },
+      "failures": [
+        {
+          "component": "api",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.000279005999914,
+          "boundary": "queued",
+          "detection_seconds": 5.000354434999963,
+          "dependency_startup_seconds": 1.826239274000045,
+          "recovery_seconds": 3.078785346000018,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "core",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.000429931999975,
+          "boundary": "before_ack",
+          "detection_seconds": 5.000369852000063,
+          "dependency_startup_seconds": 1.6680134310000767,
+          "recovery_seconds": 33.57986950499992,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "assessment",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.000339625000038,
+          "boundary": "before_ack",
+          "detection_seconds": 5.000381923999953,
+          "dependency_startup_seconds": 1.5517495609999514,
+          "recovery_seconds": 36.01090294300002,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "kafka",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 11.282344478999903,
+          "boundary": "queued",
+          "detection_seconds": 6.274394578999932,
+          "dependency_startup_seconds": 14.56740766200005,
+          "recovery_seconds": 3.106840261000002,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "camunda",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.433428258000049,
+          "boundary": "queued",
+          "detection_seconds": 5.472170282000093,
+          "dependency_startup_seconds": 17.283280597000044,
+          "recovery_seconds": 4.445004138999934,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "core_database",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.234429000999967,
+          "boundary": "queued",
+          "detection_seconds": 5.235952008000027,
+          "dependency_startup_seconds": 1.4726168380000217,
+          "recovery_seconds": 3.2411359280000624,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "assessment_database",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.459825954999928,
+          "boundary": "queued",
+          "detection_seconds": 5.4594325759999265,
+          "dependency_startup_seconds": 1.3934058840000034,
+          "recovery_seconds": 3.267903930999978,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        }
+      ],
+      "api": {
+        "rate": 10,
+        "duration_seconds": 180,
+        "planned": 1800,
+        "missed": 0,
+        "errors": 0,
+        "max_inflight": 1,
+        "max_dispatch_delay_seconds": 0.005816462999973737,
+        "elapsed_seconds": 179.9127365579999,
+        "distributions": {
+          "GET": {
+            "count": 1440,
+            "p50_seconds": 0.010118673999954808,
+            "p90_seconds": 0.02799699399997735,
+            "p95_seconds": 0.03877162700007375,
+            "p99_seconds": 0.05178523299991866,
+            "max_seconds": 0.06139866900002744
+          },
+          "PATCH": {
+            "count": 360,
+            "p50_seconds": 0.01282174000004943,
+            "p90_seconds": 0.02226041799997347,
+            "p95_seconds": 0.04508318499995312,
+            "p99_seconds": 0.06370710800001689,
+            "max_seconds": 0.08328791299993554
+          }
+        },
+        "passed": true
+      },
+      "automatic": {
+        "submitted": 100,
+        "completed": 100,
+        "max_concurrent": 5,
+        "poll_interval_seconds": 0.5,
+        "distribution": {
+          "count": 100,
+          "p50_seconds": 2.0895229550000067,
+          "p90_seconds": 2.594127169999979,
+          "p95_seconds": 2.677528792999965,
+          "p99_seconds": 3.166249365999988,
+          "max_seconds": 3.2099774140000363
+        },
+        "submission_response": {
+          "count": 100,
+          "p50_seconds": 0.015927696000062497,
+          "p90_seconds": 0.04003775399996812,
+          "p95_seconds": 0.05943394700000226,
+          "p99_seconds": 0.09120019500005583,
+          "max_seconds": 0.11059113900000739
+        },
+        "tail_seconds": 1.597019252999985,
+        "passed": true
+      }
+    },
+    {
+      "iteration": 2,
+      "complete": true,
+      "postgres_version": "18.7 (Ubuntu 18.7-1.pgdg24.04+5)",
+      "cold_start_seconds": 15.347080341000037,
+      "monitoring": {
+        "interval_seconds": 5,
+        "cycles": 45,
+        "errors": 0
+      },
+      "stalled": {
+        "detection_after_threshold_seconds": 4.425805995000019,
+        "passed": true
+      },
+      "failures": [
+        {
+          "component": "api",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.00032755999996,
+          "boundary": "queued",
+          "detection_seconds": 5.000356125000053,
+          "dependency_startup_seconds": 1.8897108590001608,
+          "recovery_seconds": 2.463337376000027,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "core",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.00044485300009,
+          "boundary": "before_ack",
+          "detection_seconds": 5.002057851000018,
+          "dependency_startup_seconds": 1.9436513409998497,
+          "recovery_seconds": 33.07159154100009,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "assessment",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.000643839000077,
+          "boundary": "before_ack",
+          "detection_seconds": 5.002171997000005,
+          "dependency_startup_seconds": 1.561054957999886,
+          "recovery_seconds": 35.469014228000106,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "kafka",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 11.264060910000126,
+          "boundary": "queued",
+          "detection_seconds": 6.2725113670001065,
+          "dependency_startup_seconds": 13.939638078999906,
+          "recovery_seconds": 3.609540726999967,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "camunda",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.454667375999861,
+          "boundary": "queued",
+          "detection_seconds": 5.433999688999847,
+          "dependency_startup_seconds": 16.575740128000007,
+          "recovery_seconds": 4.248572098000068,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "core_database",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.262630139000066,
+          "boundary": "queued",
+          "detection_seconds": 5.2313187090001065,
+          "dependency_startup_seconds": 1.3471242789998996,
+          "recovery_seconds": 3.4034131870000692,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "assessment_database",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.426127007000105,
+          "boundary": "queued",
+          "detection_seconds": 5.446602145000043,
+          "dependency_startup_seconds": 1.2218238749999273,
+          "recovery_seconds": 3.2909706580001057,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        }
+      ],
+      "api": {
+        "rate": 10,
+        "duration_seconds": 180,
+        "planned": 1800,
+        "missed": 0,
+        "errors": 0,
+        "max_inflight": 1,
+        "max_dispatch_delay_seconds": 0.006847526999763431,
+        "elapsed_seconds": 179.91307254999992,
+        "distributions": {
+          "GET": {
+            "count": 1440,
+            "p50_seconds": 0.010305991999985054,
+            "p90_seconds": 0.02919587299993509,
+            "p95_seconds": 0.03980864000004658,
+            "p99_seconds": 0.04911998199986556,
+            "max_seconds": 0.06488795600012054
+          },
+          "PATCH": {
+            "count": 360,
+            "p50_seconds": 0.013150673000154711,
+            "p90_seconds": 0.02318089000004875,
+            "p95_seconds": 0.04700207200016848,
+            "p99_seconds": 0.060170967999965796,
+            "max_seconds": 0.07610817499994482
+          }
+        },
+        "passed": true
+      },
+      "automatic": {
+        "submitted": 100,
+        "completed": 100,
+        "max_concurrent": 5,
+        "poll_interval_seconds": 0.5,
+        "distribution": {
+          "count": 100,
+          "p50_seconds": 2.1067355820000557,
+          "p90_seconds": 2.681007396000041,
+          "p95_seconds": 2.7039238639999894,
+          "p99_seconds": 2.731205136999961,
+          "max_seconds": 3.2166418180001983
+        },
+        "submission_response": {
+          "count": 100,
+          "p50_seconds": 0.018100877000051696,
+          "p90_seconds": 0.047620910999967236,
+          "p95_seconds": 0.0546780930001205,
+          "p99_seconds": 0.08682573999999477,
+          "max_seconds": 0.08991591400013021
+        },
+        "tail_seconds": 2.1202191940001285,
+        "passed": true
+      }
+    },
+    {
+      "iteration": 3,
+      "complete": true,
+      "postgres_version": "18.7 (Ubuntu 18.7-1.pgdg24.04+5)",
+      "cold_start_seconds": 15.107906703999788,
+      "monitoring": {
+        "interval_seconds": 5,
+        "cycles": 45,
+        "errors": 0
+      },
+      "stalled": {
+        "detection_after_threshold_seconds": 4.412226349999855,
+        "passed": true
+      },
+      "failures": [
+        {
+          "component": "api",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.000411413999927,
+          "boundary": "queued",
+          "detection_seconds": 5.000372496999944,
+          "dependency_startup_seconds": 1.8091218090000893,
+          "recovery_seconds": 2.414959670999906,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "core",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.000347409999904,
+          "boundary": "before_ack",
+          "detection_seconds": 5.000370425000028,
+          "dependency_startup_seconds": 1.5526192820000233,
+          "recovery_seconds": 33.354439275000004,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "assessment",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.000273036999943,
+          "boundary": "before_ack",
+          "detection_seconds": 5.000407817999985,
+          "dependency_startup_seconds": 1.5606165100000453,
+          "recovery_seconds": 35.73612549099994,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "kafka",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 11.264281363999999,
+          "boundary": "queued",
+          "detection_seconds": 6.276727842000128,
+          "dependency_startup_seconds": 14.180786499000078,
+          "recovery_seconds": 3.264981108000029,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "camunda",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.437576548999914,
+          "boundary": "queued",
+          "detection_seconds": 5.426360602999921,
+          "dependency_startup_seconds": 16.466433886999994,
+          "recovery_seconds": 4.4022123929999,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "core_database",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.223687459999837,
+          "boundary": "queued",
+          "detection_seconds": 5.239651188999915,
+          "dependency_startup_seconds": 1.323244331000069,
+          "recovery_seconds": 2.998017647000097,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        },
+        {
+          "component": "assessment_database",
+          "accepted": 10,
+          "completed": 10,
+          "outage_seconds": 10.430692694000072,
+          "boundary": "queued",
+          "detection_seconds": 5.437332422000054,
+          "dependency_startup_seconds": 1.3667668419998336,
+          "recovery_seconds": 2.938277554000024,
+          "lost": 0,
+          "duplicate_business_effects": 0,
+          "passed": true
+        }
+      ],
+      "api": {
+        "rate": 10,
+        "duration_seconds": 180,
+        "planned": 1800,
+        "missed": 0,
+        "errors": 0,
+        "max_inflight": 1,
+        "max_dispatch_delay_seconds": 0.007780615999990914,
+        "elapsed_seconds": 179.91421930299998,
+        "distributions": {
+          "GET": {
+            "count": 1440,
+            "p50_seconds": 0.009680659999958152,
+            "p90_seconds": 0.028618124999866268,
+            "p95_seconds": 0.04097410999997919,
+            "p99_seconds": 0.05380669500004842,
+            "max_seconds": 0.07170252399987476
+          },
+          "PATCH": {
+            "count": 360,
+            "p50_seconds": 0.012475629999926241,
+            "p90_seconds": 0.022720587000094383,
+            "p95_seconds": 0.04805490200010354,
+            "p99_seconds": 0.06423615499988955,
+            "max_seconds": 0.0760339280000153
+          }
+        },
+        "passed": true
+      },
+      "automatic": {
+        "submitted": 100,
+        "completed": 100,
+        "max_concurrent": 5,
+        "poll_interval_seconds": 0.5,
+        "distribution": {
+          "count": 100,
+          "p50_seconds": 2.100542097000016,
+          "p90_seconds": 2.6646848059999684,
+          "p95_seconds": 2.6935696419998294,
+          "p99_seconds": 2.6976003380000293,
+          "max_seconds": 2.709129508999922
+        },
+        "submission_response": {
+          "count": 100,
+          "p50_seconds": 0.019989259999874776,
+          "p90_seconds": 0.0413349670000116,
+          "p95_seconds": 0.07052705800015246,
+          "p99_seconds": 0.09824485400008598,
+          "max_seconds": 0.10605948000011267
+        },
+        "tail_seconds": 2.1098051000001306,
+        "passed": true
+      }
+    }
+  ]
+}
