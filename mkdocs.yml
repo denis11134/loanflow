@@ -96,4 +96,5 @@ nav:
       - 5.4. Оркестрация оценки в Camunda: 07-architecture/5.4-assessment-orchestration.md
       - 5.5. Нефункциональные требования: 07-architecture/5.5-nonfunctional-requirements.md
   - 1.7. Прототипы: 08-prototypes/index.md
+  - Запуск и проверки: 09-operations/runbook.md
   - Архитектурные решения: decisions/index.md
